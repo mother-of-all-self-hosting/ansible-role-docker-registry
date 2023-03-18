@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# It's better to run Garbage Collection with the registry being completely off.
+
+{{ devture_systemd_docker_base_host_command_systemctl }} stop {{ docker_registry_identifier }}.service
+
+function restart_service() {
+{{ devture_systemd_docker_base_host_command_systemctl }} start {{ docker_registry_identifier }}.service
+}
+
+trap restart_service EXIT
+
+docker_run_flags=''
+if [ -t 1 ]; then
+    # Got tty
+    docker_run_flags='-it'
+fi
+
+{{ devture_systemd_docker_base_host_command_docker }} run \
+$docker_run_flags \
+--rm \
+--log-driver=none \
+--network={{ docker_registry_container_network }} \
+--user={{ docker_registry_uid }}:{{ docker_registry_gid }} \
+--cap-drop=ALL \
+--read-only \
+--mount type=bind,src={{ docker_registry_data_dir_path }},dst=/var/lib/registry \
+--mount type=bind,src=/etc/timezone,dst=/etc/timezone,ro \
+--mount type=bind,src=/etc/localtime,dst=/etc/localtime,ro \
+--tmpfs=/tmp:rw,noexec,nosuid,size=512m \
+--env-file={{ docker_registry_base_path }}/env \
+{{ docker_registry_container_image }} \
+/bin/registry garbage-collect \
+/etc/docker/registry/config.yml \
+--dry-run={{ docker_registry_garbage_collect_dry_run | to_json }}

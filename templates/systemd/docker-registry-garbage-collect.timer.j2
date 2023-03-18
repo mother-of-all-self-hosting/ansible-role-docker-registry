@@ -1,0 +1,9 @@
+[Unit]
+Description=Launches the {{ docker_registry_identifier }}-garbage-collect.service periodically
+
+[Timer]
+Unit={{ docker_registry_identifier }}-garbage-collect.service
+OnCalendar={{ docker_registry_garbage_collect_schedule }}
+
+[Install]
+WantedBy=timers.target

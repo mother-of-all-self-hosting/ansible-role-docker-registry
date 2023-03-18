@@ -1,0 +1,63 @@
+---
+
+- name: Ensure Docker Registry paths exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+    owner: "{{ docker_registry_uid }}"
+    group: "{{ docker_registry_gid }}"
+  with_items:
+    - "{{ docker_registry_base_path }}"
+    - "{{ docker_registry_data_dir_path }}"
+    - "{{ docker_registry_bin_path }}"
+
+- name: Ensure Docker Registry support files created
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/{{ item }}.j2"
+    dest: "{{ docker_registry_base_path }}/{{ item }}"
+    owner: "{{ docker_registry_uid }}"
+    group: "{{ docker_registry_gid }}"
+    mode: 0640
+  with_items:
+    - env
+    - labels
+
+- name: Ensure Docker Registry bin files created
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/bin/{{ item }}.j2"
+    dest: "{{ docker_registry_bin_path }}/{{ item }}"
+    owner: "{{ docker_registry_uid }}"
+    group: "{{ docker_registry_gid }}"
+    mode: 0750
+  with_items:
+    - garbage-collect
+
+- name: Ensure Docker Registry container image is pulled
+  community.docker.docker_image:
+    name: "{{ docker_registry_container_image }}"
+    source: "{{ 'pull' if ansible_version.major > 2 or ansible_version.minor > 7 else omit }}"
+    force_source: "{{ docker_registry_container_image_force_pull if ansible_version.major > 2 or ansible_version.minor >= 8 else omit }}"
+    force: "{{ omit if ansible_version.major > 2 or ansible_version.minor >= 8 else docker_registry_container_image_force_pull }}"
+  register: result
+  retries: "{{ devture_playbook_help_container_retries_count }}"
+  delay: "{{ devture_playbook_help_container_retries_delay }}"
+  until: result is not failed
+
+- name: Ensure Docker Registry container network is created
+  community.general.docker_network:
+    name: "{{ docker_registry_container_network }}"
+    driver: bridge
+
+- name: Ensure Docker Registry systemd service installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/systemd/{{ item.src }}"
+    dest: "{{ devture_systemd_docker_base_systemd_path }}/{{ item.dst }}"
+    mode: 0640
+  with_items:
+    - src: docker-registry.service.j2
+      dst: "{{ docker_registry_identifier }}.service"
+    - src: docker-registry-garbage-collect.service.j2
+      dst: "{{ docker_registry_identifier }}-garbage-collect.service"
+    - src: docker-registry-garbage-collect.timer.j2
+      dst: "{{ docker_registry_identifier }}-garbage-collect.timer"

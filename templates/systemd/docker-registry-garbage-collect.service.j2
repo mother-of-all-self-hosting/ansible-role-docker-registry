@@ -1,0 +1,6 @@
+[Unit]
+Description=Performs container registry garbage collection
+
+[Service]
+Type=oneshot
+ExecStart={{ docker_registry_bin_path }}/garbage-collect

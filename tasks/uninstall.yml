@@ -1,0 +1,32 @@
+---
+
+- name: Check existence of Docker Registry systemd service
+  ansible.builtin.stat:
+    path: "{{ devture_systemd_docker_base_systemd_path }}/{{ docker_registry_identifier }}-server.service"
+  register: docker_registry_service_stat
+
+- when: docker_registry_service_stat.stat.exists | bool
+  block:
+    - name: Ensure Docker Registry systemd services are stopped
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      with_items:
+        - "{{ docker_registry_identifier }}"
+        - "{{ docker_registry_identifier }}-garbage-collect"
+
+    - name: Ensure Docker Registry systemd services do not exists
+      ansible.builtin.file:
+        path: "{{ devture_systemd_docker_base_systemd_path }}/{{ item }}"
+        state: absent
+      with_items:
+        - "{{ docker_registry_identifier }}.service"
+        - "{{ docker_registry_identifier }}-garbage-collect.service"
+        - "{{ docker_registry_identifier }}-garbage-collect.timer"
+
+    - name: Ensure Docker Registry path doesn't exist
+      ansible.builtin.file:
+        path: "{{ docker_registry_base_path }}"
+        state: absent

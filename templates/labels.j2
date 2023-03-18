@@ -12,7 +12,7 @@ traefik.http.middlewares.{{ docker_registry_identifier }}-ip-whitelist.ipwhiteli
 traefik.http.routers.{{ docker_registry_identifier }}-public.rule={{ docker_registry_container_labels_traefik_rule_public }}
 traefik.http.routers.{{ docker_registry_identifier }}-public.service={{ docker_registry_identifier }}
 traefik.http.routers.{{ docker_registry_identifier }}-public.tls={{ docker_registry_container_labels_traefik_tls | to_json }}
-{% if peertube_container_labels_traefik_tls %}
+{% if docker_registry_container_labels_traefik_tls %}
 traefik.http.routers.{{ docker_registry_identifier }}-public.tls.certResolver={{ docker_registry_container_labels_traefik_tls_certResolver }}
 {% endif %}
 traefik.http.routers.{{ docker_registry_identifier }}-public.entrypoints={{ docker_registry_container_labels_traefik_entrypoints }}
@@ -21,7 +21,7 @@ traefik.http.routers.{{ docker_registry_identifier }}-private.rule={{ docker_reg
 traefik.http.routers.{{ docker_registry_identifier }}-private.middlewares={{ docker_registry_identifier }}-ip-whitelist@docker
 traefik.http.routers.{{ docker_registry_identifier }}-private.service={{ docker_registry_identifier }}
 traefik.http.routers.{{ docker_registry_identifier }}-private.tls={{ docker_registry_container_labels_traefik_tls | to_json }}
-{% if peertube_container_labels_traefik_tls %}
+{% if docker_registry_container_labels_traefik_tls %}
 traefik.http.routers.{{ docker_registry_identifier }}-private.tls.certResolver={{ docker_registry_container_labels_traefik_tls_certResolver }}
 {% endif %}
 traefik.http.routers.{{ docker_registry_identifier }}-private.entrypoints={{ docker_registry_container_labels_traefik_entrypoints }}

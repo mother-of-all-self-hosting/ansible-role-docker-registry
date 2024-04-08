@@ -1,5 +1,7 @@
 ---
 
+# Project source code URL: https://github.com/distribution/distribution/
+
 docker_registry_enabled: false
 
 docker_registry_identifier: container-registry

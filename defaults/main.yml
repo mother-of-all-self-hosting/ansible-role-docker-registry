@@ -56,6 +56,11 @@ docker_registry_garbage_collect_schedule: 'Sunday *-*-* 08:30:00'
 # docker_registry_garbage_collect_dry_run controls if --dry-run=true is passed to the garbage collection command
 docker_registry_garbage_collect_dry_run: false
 
+# docker_registry_garbage_collect_stop_service_enabled controls if the Registry service will be stopped while garbage collection is being done.
+# For smaller registries, this may be the safer thing to do.
+# For larger ones, fully stopping the registry can cause too much downtime.
+docker_registry_garbage_collect_stop_service_enabled: false
+
 # docker_registry_container_http_bind_port controls whether (and how) the container
 # exposes its HTTP port (`docker_registry_config_rocket_port`).
 # Leave empty to not expose it.

@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# It's better to run Garbage Collection with the registry being completely off.
-
+{% if docker_registry_garbage_collect_stop_service_enabled %}
 {{ devture_systemd_docker_base_host_command_systemctl }} stop {{ docker_registry_identifier }}.service
 
 function restart_service() {
@@ -9,6 +8,7 @@ function restart_service() {
 }
 
 trap restart_service EXIT
+{% endif %}
 
 docker_run_flags=''
 if [ -t 1 ]; then

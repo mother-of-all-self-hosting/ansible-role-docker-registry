@@ -2,13 +2,19 @@
 
 {% if docker_registry_garbage_collect_stop_service_enabled %}
 {{ devture_systemd_docker_base_host_command_systemctl }} stop {{ docker_registry_identifier }}.service
+{% endif %}
 
-function restart_service() {
-{{ devture_systemd_docker_base_host_command_systemctl }} start {{ docker_registry_identifier }}.service
+{{ docker_registry_garbage_collect_command_pre }}
+
+function on_exit() {
+    {% if docker_registry_garbage_collect_stop_service_enabled %}
+    {{ devture_systemd_docker_base_host_command_systemctl }} start {{ docker_registry_identifier }}.service
+    {% endif %}
+
+    {{ docker_registry_garbage_collect_command_post }}
 }
 
-trap restart_service EXIT
-{% endif %}
+trap on_exit EXIT
 
 docker_run_flags=''
 if [ -t 1 ]; then

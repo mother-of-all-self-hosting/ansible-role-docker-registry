@@ -25,6 +25,11 @@ docker_registry_container_network: "{{ docker_registry_identifier }}"
 # The playbook does not create these networks, so make sure they already exist.
 docker_registry_container_additional_networks: []
 
+# Intentionally leaving this blank, instead of defaulting it to `docker_registry_hostname`, to avoid specifying a hostname
+# which could render other services on that hostname potentially unreachable.
+# See: https://github.com/mother-of-all-self-hosting/mash-playbook/issues/391
+docker_registry_container_hostname: ''
+
 docker_registry_base_path: "/registry"
 docker_registry_data_dir_path: "{{ docker_registry_base_path }}/data"
 docker_registry_bin_path: "{{ docker_registry_base_path }}/bin"

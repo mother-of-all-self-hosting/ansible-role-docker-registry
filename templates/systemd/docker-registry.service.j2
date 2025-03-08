@@ -20,7 +20,9 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			--user={{ docker_registry_uid }}:{{ docker_registry_gid }} \
 			--cap-drop=ALL \
 			--read-only \
-			--hostname={{ docker_registry_hostname }} \
+			{% if docker_registry_container_hostname %}
+			--hostname={{ docker_registry_container_hostname }} \
+			{% endif %}
 			{% if docker_registry_container_http_bind_port %}
 			-p {{ docker_registry_container_http_bind_port }}:5000 \
 			{% endif %}

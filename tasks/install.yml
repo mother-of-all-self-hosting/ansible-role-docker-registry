@@ -46,8 +46,10 @@
 
 - name: Ensure Docker Registry container network is created
   community.general.docker_network:
+    enable_ipv6: "{{ devture_systemd_docker_base_ipv6_enabled }}"
     name: "{{ docker_registry_container_network }}"
     driver: bridge
+    driver_options: "{{ devture_systemd_docker_base_container_networks_driver_options }}"
 
 - name: Ensure Docker Registry systemd service installed
   ansible.builtin.template:

@@ -47,6 +47,9 @@ docker_registry_container_http_bind_port: ''
 # The base container network. It will be auto-created by this role if it doesn't exist already.
 docker_registry_container_network: "{{ docker_registry_identifier }}"
 
+# The port number in the container
+docker_registry_container_http_port: 5000
+
 # A list of additional container networks that the container would be connected to.
 # The playbook does not create these networks, so make sure they already exist.
 docker_registry_container_additional_networks: "{{ docker_registry_container_additional_networks_auto + docker_registry_container_additional_networks_custom }}"

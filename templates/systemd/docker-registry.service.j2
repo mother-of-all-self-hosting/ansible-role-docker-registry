@@ -27,10 +27,10 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			--rm \
 			--name={{ docker_registry_identifier }} \
 			--log-driver=none \
-			--network={{ docker_registry_container_network }} \
 			--user={{ docker_registry_uid }}:{{ docker_registry_gid }} \
 			--cap-drop=ALL \
 			--read-only \
+			--network={{ docker_registry_container_network }} \
 			{% if docker_registry_container_hostname %}
 			--hostname={{ docker_registry_container_hostname }} \
 			{% endif %}

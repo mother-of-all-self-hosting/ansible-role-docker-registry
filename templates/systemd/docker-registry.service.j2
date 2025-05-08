@@ -12,6 +12,9 @@ Description=Container Registry ({{ docker_registry_identifier }})
 Requires={{ service }}
 After={{ service }}
 {% endfor %}
+{% for service in docker_registry_systemd_wanted_services_list %}
+Wants={{ service }}
+{% endfor %}
 DefaultDependencies=no
 
 [Service]

@@ -49,7 +49,9 @@ docker_registry_container_network: "{{ docker_registry_identifier }}"
 
 # A list of additional container networks that the container would be connected to.
 # The playbook does not create these networks, so make sure they already exist.
-docker_registry_container_additional_networks: []
+docker_registry_container_additional_networks: "{{ docker_registry_container_additional_networks_auto + docker_registry_container_additional_networks_custom }}"
+docker_registry_container_additional_networks_auto: []
+docker_registry_container_additional_networks_custom: []
 
 # docker_registry_container_labels_traefik_enabled controls whether labels to assist a Traefik reverse-proxy will be attached to the container.
 # See `../templates/labels.j2` for details.

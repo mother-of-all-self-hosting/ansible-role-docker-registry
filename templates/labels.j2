@@ -11,7 +11,7 @@ traefik.enable=true
 traefik.docker.network={{ docker_registry_container_labels_traefik_docker_network }}
 {% endif %}
 
-traefik.http.services.{{ docker_registry_identifier }}.loadbalancer.server.port=5000
+traefik.http.services.{{ docker_registry_identifier }}.loadbalancer.server.port={{ docker_registry_container_http_port }}
 
 traefik.http.middlewares.{{ docker_registry_identifier }}-ip-whitelist.ipwhitelist.sourcerange={{ docker_registry_private_services_whitelisted_ip_ranges | join(', ') }}
 

@@ -35,7 +35,7 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			--hostname={{ docker_registry_container_hostname }} \
 			{% endif %}
 			{% if docker_registry_container_http_bind_port %}
-			-p {{ docker_registry_container_http_bind_port }}:5000 \
+			-p {{ docker_registry_container_http_bind_port }}:{{ docker_registry_container_http_port }} \
 			{% endif %}
 			--env-file={{ docker_registry_base_path }}/env \
 			--label-file={{ docker_registry_base_path }}/labels \

@@ -75,10 +75,10 @@ docker_registry_container_labels_traefik_tls_certResolver: default  # noqa var-n
 docker_registry_container_labels_additional_labels: ''
 
 # List of systemd services that the Container Registry systemd service depends on
-docker_registry_systemd_required_systemd_services_list: "{{ docker_registry_systemd_required_systemd_services_list_default + docker_registry_systemd_required_systemd_services_list_auto + docker_registry_systemd_required_systemd_services_list_custom }}"
-docker_registry_systemd_required_systemd_services_list_default: "{{ [devture_systemd_docker_base_docker_service_name] if devture_systemd_docker_base_docker_service_name else [] }}"
-docker_registry_systemd_required_systemd_services_list_auto: []
-docker_registry_systemd_required_systemd_services_list_custom: []
+docker_registry_systemd_required_services_list: "{{ docker_registry_systemd_required_services_list_default + docker_registry_systemd_required_services_list_auto + docker_registry_systemd_required_services_list_custom }}"
+docker_registry_systemd_required_services_list_default: "{{ [devture_systemd_docker_base_docker_service_name] if devture_systemd_docker_base_docker_service_name else [] }}"
+docker_registry_systemd_required_services_list_auto: []
+docker_registry_systemd_required_services_list_custom: []
 
 # docker_registry_private_services_whitelisted_ip_ranges contains a list of whitelisted IP ranges
 # which can access private services (pushing new images, deleting images, etc.)

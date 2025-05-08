@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2023 Slavi Pantaleev
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Docker Registry Ansible role
 
 This is an [Ansible](https://www.ansible.com/) role which installs the [Docker Registry](https://docs.docker.com/registry/) container image distribution registry to run as a [Docker](https://www.docker.com/) container wrapped in a systemd service.

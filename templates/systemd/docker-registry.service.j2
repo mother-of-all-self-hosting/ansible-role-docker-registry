@@ -1,3 +1,9 @@
+{#
+SPDX-FileCopyrightText: 2023 Slavi Pantaleev
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+#}
+
 [Unit]
 Description=Container Registry ({{ docker_registry_identifier }})
 {% for service in docker_registry_systemd_required_systemd_services_list %}

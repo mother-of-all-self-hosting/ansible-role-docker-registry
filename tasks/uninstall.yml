@@ -21,7 +21,7 @@
         - "{{ docker_registry_identifier }}"
         - "{{ docker_registry_identifier }}-garbage-collect"
 
-    - name: Ensure Docker Registry systemd services do not exists
+    - name: Ensure Docker Registry systemd services do not exist
       ansible.builtin.file:
         path: "{{ devture_systemd_docker_base_systemd_path }}/{{ item }}"
         state: absent
@@ -30,7 +30,7 @@
         - "{{ docker_registry_identifier }}-garbage-collect.service"
         - "{{ docker_registry_identifier }}-garbage-collect.timer"
 
-    - name: Ensure Docker Registry path doesn't exist
+    - name: Ensure Docker Registry path does not exist
       ansible.builtin.file:
         path: "{{ docker_registry_base_path }}"
         state: absent

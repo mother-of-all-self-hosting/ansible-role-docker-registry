@@ -112,10 +112,10 @@ docker_registry_garbage_collect_command_pre: ''
 # Command to run at the end of garbage collection
 docker_registry_garbage_collect_command_post: ''
 
-# docker_registry_container_additional_environment_variables contains a multiline string with additional environment variables to pass to the container.
+# docker_registry_environment_variables_additional_variables contains a multiline string with additional environment variables to pass to the container.
 #
 # Example:
-# docker_registry_container_additional_environment_variables: |
+# docker_registry_environment_variables_additional_variables: |
 #   VAR=1
 #   ANOTHER=value
-docker_registry_container_additional_environment_variables: ''
+docker_registry_environment_variables_additional_variables: ''

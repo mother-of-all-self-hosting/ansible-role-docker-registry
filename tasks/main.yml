@@ -4,21 +4,21 @@
 
 ---
 
-- tags:
-    - setup-all
-    - setup-docker-registry
-    - install-all
-    - install-docker-registry
-  block:
+- block:
     - when: docker_registry_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
 
     - when: docker_registry_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
-
-- tags:
+  tags:
     - setup-all
     - setup-docker-registry
-  block:
+    - install-all
+    - install-docker-registry
+
+- block:
     - when: not docker_registry_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/uninstall.yml"
+  tags:
+    - setup-all
+    - setup-docker-registry

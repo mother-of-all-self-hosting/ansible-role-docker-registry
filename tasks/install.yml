@@ -4,12 +4,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-
 - name: Ensure Docker Registry paths exist
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    mode: 0750
+    mode: "0750"
     owner: "{{ docker_registry_uid }}"
     group: "{{ docker_registry_gid }}"
   with_items:
@@ -21,7 +20,7 @@
   ansible.builtin.template:
     src: "{{ role_path }}/templates/{{ item }}.j2"
     dest: "{{ docker_registry_base_path }}/{{ item }}"
-    mode: 0640
+    mode: "0640"
     owner: "{{ docker_registry_uid }}"
     group: "{{ docker_registry_gid }}"
   with_items:
@@ -32,7 +31,7 @@
   ansible.builtin.template:
     src: "{{ role_path }}/templates/bin/{{ item }}.j2"
     dest: "{{ docker_registry_bin_path }}/{{ item }}"
-    mode: 0750
+    mode: "0750"
     owner: "{{ docker_registry_uid }}"
     group: "{{ docker_registry_gid }}"
   with_items:
@@ -60,7 +59,7 @@
   ansible.builtin.template:
     src: "{{ role_path }}/templates/systemd/{{ item.src }}"
     dest: "{{ devture_systemd_docker_base_systemd_path }}/{{ item.dst }}"
-    mode: 0644
+    mode: "0644"
   with_items:
     - src: docker-registry.service.j2
       dst: "{{ docker_registry_identifier }}.service"

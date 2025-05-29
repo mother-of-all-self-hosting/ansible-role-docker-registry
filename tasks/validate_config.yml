@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-
 - name: (Deprecation) Catch and report renamed settings
   ansible.builtin.fail:
     msg: >-
@@ -11,11 +10,11 @@
       Please change your configuration to rename the variable (`{{ item.old }}` -> `{{ item.new }}`).
   when: "item.old in vars"
   with_items:
-    - {'old': 'docker_registry_systemd_required_systemd_services_list', 'new': 'docker_registry_systemd_required_services_list'}
-    - {'old': 'docker_registry_systemd_required_systemd_services_list_default', 'new': 'docker_registry_systemd_required_services_list_default'}
-    - {'old': 'docker_registry_systemd_required_systemd_services_list_auto', 'new': 'docker_registry_systemd_required_services_list_auto'}
-    - {'old': 'docker_registry_systemd_required_systemd_services_list_custom', 'new': 'docker_registry_systemd_required_services_list_custom'}
-    - {'old': 'docker_registry_container_additional_environment_variables', 'new': 'docker_registry_environment_variables_additional_variables'}
+    - { "old": "docker_registry_systemd_required_systemd_services_list", "new": "docker_registry_systemd_required_services_list" }
+    - { "old": "docker_registry_systemd_required_systemd_services_list_default", "new": "docker_registry_systemd_required_services_list_default" }
+    - { "old": "docker_registry_systemd_required_systemd_services_list_auto", "new": "docker_registry_systemd_required_services_list_auto" }
+    - { "old": "docker_registry_systemd_required_systemd_services_list_custom", "new": "docker_registry_systemd_required_services_list_custom" }
+    - { "old": "docker_registry_container_additional_environment_variables", "new": "docker_registry_environment_variables_additional_variables" }
 
 - name: Fail if required Container Registry settings not defined
   ansible.builtin.fail:

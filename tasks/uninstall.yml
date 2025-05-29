@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-
 - name: Check existence of Docker Registry systemd service
   ansible.builtin.stat:
     path: "{{ devture_systemd_docker_base_systemd_path }}/{{ docker_registry_identifier }}-server.service"
   register: docker_registry_service_stat
 
-- when: docker_registry_service_stat.stat.exists | bool
+- name: Uninstall docker_registry systemd services and files
+  when: docker_registry_service_stat.stat.exists | bool
   block:
     - name: Ensure Docker Registry systemd services are stopped
       ansible.builtin.service:

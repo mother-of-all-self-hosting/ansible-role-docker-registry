@@ -11,8 +11,6 @@ traefik.enable=true
 traefik.docker.network={{ docker_registry_container_labels_traefik_docker_network }}
 {% endif %}
 
-traefik.http.services.{{ docker_registry_identifier }}.loadbalancer.server.port={{ docker_registry_container_http_port }}
-
 traefik.http.middlewares.{{ docker_registry_identifier }}-ip-whitelist.ipwhitelist.sourcerange={{ docker_registry_private_services_whitelisted_ip_ranges | join(', ') }}
 
 traefik.http.routers.{{ docker_registry_identifier }}-public.rule={{ docker_registry_container_labels_traefik_rule_public }}
@@ -31,6 +29,8 @@ traefik.http.routers.{{ docker_registry_identifier }}-private.tls={{ docker_regi
 traefik.http.routers.{{ docker_registry_identifier }}-private.tls.certResolver={{ docker_registry_container_labels_traefik_tls_certResolver }}
 {% endif %}
 traefik.http.routers.{{ docker_registry_identifier }}-private.entrypoints={{ docker_registry_container_labels_traefik_entrypoints }}
+
+traefik.http.services.{{ docker_registry_identifier }}.loadbalancer.server.port={{ docker_registry_container_http_port }}
 {% endif %}
 
 {{ docker_registry_container_labels_additional_labels }}

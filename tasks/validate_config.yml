@@ -36,6 +36,6 @@
   ansible.builtin.fail:
     msg: >-
       You need to define a required configuration setting (`{{ item }}`) when `docker_registry_container_labels_traefik_enabled`
-  when: "docker_registry_container_labels_traefik_enabled | bool and vars[item] == ''"
+  when: "docker_registry_container_labels_traefik_enabled | bool and lookup('vars', item, default='') | string | length == 0"
   with_items:
     - docker_registry_container_labels_traefik_docker_network

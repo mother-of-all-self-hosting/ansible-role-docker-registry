@@ -91,7 +91,10 @@ docker_registry_systemd_required_services_list_auto: []
 docker_registry_systemd_required_services_list_custom: []
 
 # List of systemd services that the Container Registry systemd service wants
-docker_registry_systemd_wanted_services_list: []
+docker_registry_systemd_wanted_services_list: "{{ docker_registry_systemd_wanted_services_list_default + docker_registry_systemd_wanted_services_list_auto + docker_registry_systemd_wanted_services_list_custom }}"
+docker_registry_systemd_wanted_services_list_default: []
+docker_registry_systemd_wanted_services_list_auto: []
+docker_registry_systemd_wanted_services_list_custom: []
 
 # docker_registry_private_services_whitelisted_ip_ranges contains a list of whitelisted IP ranges
 # which can access private services (pushing new images, deleting images, etc.)

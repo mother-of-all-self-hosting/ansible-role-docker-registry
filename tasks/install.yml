@@ -14,7 +14,7 @@
     group: "{{ docker_registry_gid }}"
   with_items:
     - "{{ docker_registry_base_path }}"
-    - "{{ docker_registry_data_dir_path }}"
+    - "{{ docker_registry_data_path }}"
     - "{{ docker_registry_bin_path }}"
 
 - name: Ensure Docker Registry support files installed

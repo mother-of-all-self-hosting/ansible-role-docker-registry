@@ -36,7 +36,7 @@ $docker_run_flags \
 --user={{ docker_registry_uid }}:{{ docker_registry_gid }} \
 --cap-drop=ALL \
 --read-only \
---mount type=bind,src={{ docker_registry_data_dir_path }},dst=/var/lib/registry \
+--mount type=bind,src={{ docker_registry_data_path }},dst=/var/lib/registry \
 --mount type=bind,src=/etc/timezone,dst=/etc/timezone,ro \
 --mount type=bind,src=/etc/localtime,dst=/etc/localtime,ro \
 --tmpfs=/tmp:rw,noexec,nosuid,size=512m \

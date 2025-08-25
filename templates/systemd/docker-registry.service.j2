@@ -39,7 +39,7 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
       {% endif %}
       --env-file={{ docker_registry_base_path }}/env \
       --label-file={{ docker_registry_base_path }}/labels \
-      --mount type=bind,src={{ docker_registry_data_dir_path }},dst=/var/lib/registry \
+      --mount type=bind,src={{ docker_registry_data_path }},dst=/var/lib/registry \
       --tmpfs=/tmp:rw,noexec,nosuid,size=512m \
       {{ docker_registry_container_image_self_build_name if docker_registry_container_image_self_build else docker_registry_container_image }}
 

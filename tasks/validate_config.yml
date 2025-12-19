@@ -23,9 +23,10 @@
       You need to define a required configuration setting (`{{ item }}`).
   when: "lookup('vars', item, default='') | string | length == 0"
   with_items:
-    - docker_registry_hostname
     - docker_registry_uid
     - docker_registry_gid
+    - docker_registry_hostname
+    - docker_registry_container_network
 
 - name: Fail if required Container Registry whitelisted IP ranges not defined
   ansible.builtin.fail:

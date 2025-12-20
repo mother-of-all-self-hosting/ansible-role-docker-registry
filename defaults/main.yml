@@ -82,7 +82,9 @@ docker_registry_container_labels_traefik_tls_certResolver: default  # noqa var-n
 # docker_registry_container_labels_additional_labels: |
 #   my.label=1
 #   another.label="here"
-docker_registry_container_labels_additional_labels: ''
+docker_registry_container_labels_additional_labels: "{{ docker_registry_container_labels_additional_labels_auto | combine(docker_registry_container_labels_additional_labels_custom) }}"
+docker_registry_container_labels_additional_labels_auto: {}
+docker_registry_container_labels_additional_labels_custom: {}
 
 # List of systemd services that the Container Registry systemd service depends on
 docker_registry_systemd_required_services_list: "{{ docker_registry_systemd_required_services_list_default + docker_registry_systemd_required_services_list_auto + docker_registry_systemd_required_services_list_custom }}"

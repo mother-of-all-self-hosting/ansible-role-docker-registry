@@ -20,16 +20,16 @@ docker_registry_bin_path: "{{ docker_registry_base_path }}/bin"
 # renovate: datasource=docker depName=registry versioning=semver
 docker_registry_version: 2.8.3
 
-docker_registry_uid: ''
-docker_registry_gid: ''
+docker_registry_uid: ""
+docker_registry_gid: ""
 
 # The fully-qualified name of your Container Registry server (e.g. `registry.example.com`)
-docker_registry_hostname: ''
+docker_registry_hostname: ""
 
 # Intentionally leaving this blank, instead of defaulting it to `docker_registry_hostname`, to avoid specifying a hostname
 # which could render other services on that hostname potentially unreachable.
 # See: https://github.com/mother-of-all-self-hosting/mash-playbook/issues/391
-docker_registry_container_hostname: ''
+docker_registry_container_hostname: ""
 
 docker_registry_container_image: "{{ docker_registry_container_image_registry_prefix }}registry:{{ docker_registry_container_image_tag }}"
 docker_registry_container_image_tag: "{{ docker_registry_version }}"
@@ -49,7 +49,7 @@ docker_registry_container_image_self_build_environment_buildplatform: linux/amd6
 # exposes its HTTP port (`docker_registry_config_rocket_port`).
 # Leave empty to not expose it.
 # Example values: `127.0.0.1:8080`, `0.0.0.0:8080`, `8080`.
-docker_registry_container_http_bind_port: ''
+docker_registry_container_http_bind_port: ""
 
 # The base container network. It will be auto-created by this role if it doesn't exist already.
 docker_registry_container_network: "{{ docker_registry_identifier }}"
@@ -68,7 +68,7 @@ docker_registry_container_additional_networks_custom: []
 #
 # To inject your own other container labels, see `docker_registry_container_labels_additional_labels`.
 docker_registry_container_labels_traefik_enabled: true
-docker_registry_container_labels_traefik_docker_network: ''
+docker_registry_container_labels_traefik_docker_network: ""
 docker_registry_container_labels_traefik_rule_public: "Host(`{{ docker_registry_hostname }}`) && (Method(`GET`) || Method(`HEAD`))"
 docker_registry_container_labels_traefik_rule_private: "Host(`{{ docker_registry_hostname }}`) && (Method(`POST`) || Method(`PUT`) || Method(`DELETE`) || Method(`PATCH`))"
 docker_registry_container_labels_traefik_entrypoints: web-secure
@@ -128,10 +128,10 @@ docker_registry_garbage_collect_dry_run: false
 docker_registry_garbage_collect_stop_service_enabled: false
 
 # Command to run at the start of garbage collection
-docker_registry_garbage_collect_command_pre: ''
+docker_registry_garbage_collect_command_pre: ""
 
 # Command to run at the end of garbage collection
-docker_registry_garbage_collect_command_post: ''
+docker_registry_garbage_collect_command_post: ""
 
 # docker_registry_environment_variables_additional_variables contains a multiline string with additional environment variables to pass to the container.
 #
@@ -139,4 +139,4 @@ docker_registry_garbage_collect_command_post: ''
 # docker_registry_environment_variables_additional_variables: |
 #   VAR=1
 #   ANOTHER=value
-docker_registry_environment_variables_additional_variables: ''
+docker_registry_environment_variables_additional_variables: ""

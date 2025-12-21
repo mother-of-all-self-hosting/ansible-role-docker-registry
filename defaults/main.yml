@@ -87,6 +87,11 @@ docker_registry_container_labels_additional_labels: "{{ docker_registry_containe
 docker_registry_container_labels_additional_labels_auto: {}
 docker_registry_container_labels_additional_labels_custom: {}
 
+# A list of extra arguments to pass to the container (`docker create` command)
+docker_registry_container_extra_arguments: "{{ docker_registry_container_extra_arguments_auto + docker_registry_container_extra_arguments_custom }}"
+docker_registry_container_extra_arguments_auto: []
+docker_registry_container_extra_arguments_custom: []
+
 # List of systemd services that the Container Registry systemd service depends on
 docker_registry_systemd_required_services_list: "{{ docker_registry_systemd_required_services_list_default + docker_registry_systemd_required_services_list_auto + docker_registry_systemd_required_services_list_custom }}"
 docker_registry_systemd_required_services_list_default: "{{ [devture_systemd_docker_base_docker_service_name] if devture_systemd_docker_base_docker_service_name else [] }}"

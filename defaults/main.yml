@@ -18,7 +18,7 @@ docker_registry_data_path: "{{ docker_registry_base_path }}/data"
 docker_registry_bin_path: "{{ docker_registry_base_path }}/bin"
 
 # renovate: datasource=docker depName=registry versioning=semver
-docker_registry_version: 2.8.3
+docker_registry_version: 3.0.0
 
 docker_registry_uid: ''
 docker_registry_gid: ''

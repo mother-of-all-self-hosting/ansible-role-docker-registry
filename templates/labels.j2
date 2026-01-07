@@ -33,4 +33,6 @@ traefik.http.routers.{{ docker_registry_identifier }}-private.entrypoints={{ doc
 traefik.http.services.{{ docker_registry_identifier }}.loadbalancer.server.port={{ docker_registry_container_http_port }}
 {% endif %}
 
-{{ docker_registry_container_labels_additional_labels }}
+{% for arg in docker_registry_container_labels_additional_labels %}
+{{ arg }}
+{% endfor %}

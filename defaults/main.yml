@@ -1,9 +1,10 @@
-# SPDX-FileCopyrightText: 2023 - 2024 Nikita Chernyi
-# SPDX-FileCopyrightText: 2023 - 2025 Slavi Pantaleev
+# SPDX-FileCopyrightText: 2023, 2024 Nikita Chernyi
+# SPDX-FileCopyrightText: 2023-2025 Slavi Pantaleev
+# SPDX-FileCopyrightText: 2024 Julian-Samuel Gebühr
 # SPDX-FileCopyrightText: 2024 Kian Foroodi
 # SPDX-FileCopyrightText: 2024 Sergio Durigan Junior
 # SPDX-FileCopyrightText: 2025 MASH project contributors
-# SPDX-FileCopyrightText: 2025 Suguru Hirahara
+# SPDX-FileCopyrightText: 2025, 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -45,10 +46,9 @@ docker_registry_container_image_self_build_repo_version: "{{ 'v' + docker_regist
 docker_registry_container_image_self_build_src_files_path: "{{ docker_registry_base_path }}/docker-src"
 docker_registry_container_image_self_build_environment_buildplatform: linux/amd64
 
-# docker_registry_container_http_host_bind_port controls whether (and how) the container
-# exposes its HTTP port (`docker_registry_config_rocket_port`).
-# Leave empty to not expose it.
-# Example values: `127.0.0.1:8080`, `0.0.0.0:8080`, `8080`.
+# Controls whether the container exposes its HTTP port (tcp/5000 in the container).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 docker_registry_container_http_host_bind_port: ""
 
 # The base container network. It will be auto-created by this role if it doesn't exist already.
@@ -58,7 +58,8 @@ docker_registry_container_network: "{{ docker_registry_identifier }}"
 docker_registry_container_http_port: 5000
 
 # A list of additional container networks that the container would be connected to.
-# The playbook does not create these networks, so make sure they already exist.
+# The role does not create these networks, so make sure they already exist.
+# Use this to expose this container to another reverse proxy, which runs in a different container network.
 docker_registry_container_additional_networks: "{{ docker_registry_container_additional_networks_auto + docker_registry_container_additional_networks_custom }}"
 docker_registry_container_additional_networks_auto: []
 docker_registry_container_additional_networks_custom: []

@@ -11,6 +11,7 @@
   when: "lookup('ansible.builtin.varnames', ('^' + item.old + '$'), wantlist=True) | length > 0"
   with_items:
     - { "old": "docker_registry_data_dir_path", "new": "docker_registry_data_path" }
+    - { "old": "docker_registry_container_http_bind_port", "new": "docker_registry_container_http_host_bind_port" }
     - { "old": "docker_registry_systemd_required_systemd_services_list", "new": "docker_registry_systemd_required_services_list" }
     - { "old": "docker_registry_systemd_required_systemd_services_list_default", "new": "docker_registry_systemd_required_services_list_default" }
     - { "old": "docker_registry_systemd_required_systemd_services_list_auto", "new": "docker_registry_systemd_required_services_list_auto" }

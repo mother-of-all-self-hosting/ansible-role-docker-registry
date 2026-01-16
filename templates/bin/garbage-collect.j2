@@ -39,7 +39,7 @@ $docker_run_flags \
 --mount type=bind,src={{ docker_registry_data_path }},dst=/var/lib/registry \
 --mount type=bind,src=/etc/timezone,dst=/etc/timezone,ro \
 --mount type=bind,src=/etc/localtime,dst=/etc/localtime,ro \
---tmpfs=/tmp:rw,noexec,nosuid,size=512m \
+--tmpfs=/tmp:rw,noexec,nosuid,size={{ docker_registry_garbage_collect_tmpfs_run_size }} \
 --env-file={{ docker_registry_base_path }}/env \
 {{ docker_registry_container_image }} \
 /bin/registry garbage-collect \

@@ -88,6 +88,12 @@ docker_registry_container_labels_additional_labels: "{{ docker_registry_containe
 docker_registry_container_labels_additional_labels_auto: []
 docker_registry_container_labels_additional_labels_custom: []
 
+# Specify the size of the container's tmpfs volume
+docker_registry_container_tmpfs_tmp_size: 512m
+
+# Specify the size of the container's tmpfs volume
+docker_registry_garbage_collect_tmpfs_run_size: 512m
+
 # A list of extra arguments to pass to the container (`docker create` command)
 docker_registry_container_extra_arguments: "{{ docker_registry_container_extra_arguments_auto + docker_registry_container_extra_arguments_custom }}"
 docker_registry_container_extra_arguments_auto: []

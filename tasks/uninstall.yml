@@ -36,6 +36,7 @@
       community.docker.docker_network:
         name: "{{ docker_registry_container_network }}"
         state: absent
+      register: docker_registry_network_deletion_result
 
     - name: Ensure Docker Registry container network does not exist via ansible.builtin.command
       when: devture_systemd_docker_base_container_network_creation_method == 'command'
@@ -43,8 +44,8 @@
         cmd: >-
           {{ devture_systemd_docker_base_host_command_docker }} network rm
           {{ docker_registry_container_network }}
-      register: network_deletion_result
-      changed_when: docker_registry_container_network in network_deletion_result.stdout
+      register: docker_registry_network_deletion_result
+      changed_when: docker_registry_container_network in docker_registry_network_deletion_result.stdout
 
     - name: Ensure Docker Registry path does not exist
       ansible.builtin.file:

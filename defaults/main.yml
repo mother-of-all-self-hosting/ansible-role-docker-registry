@@ -37,7 +37,6 @@ docker_registry_container_image_tag: "{{ docker_registry_version }}"
 docker_registry_container_image_registry_prefix: "{{ docker_registry_container_image_registry_prefix_upstream }}"
 docker_registry_container_image_registry_prefix_upstream: "{{ docker_registry_container_image_registry_prefix_upstream_default }}"
 docker_registry_container_image_registry_prefix_upstream_default: docker.io/
-docker_registry_container_image_force_pull: "{{ docker_registry_container_image.endswith(':latest') }}"
 
 docker_registry_container_image_self_build: false
 docker_registry_container_image_self_build_name: "distribution/distribution:{{ docker_registry_container_image_self_build_repo_version }}"

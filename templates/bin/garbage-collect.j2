@@ -44,4 +44,5 @@ $docker_run_flags \
 {{ docker_registry_container_image }} \
 /bin/registry garbage-collect \
 /etc/docker/registry/config.yml \
---dry-run={{ docker_registry_garbage_collect_dry_run | to_json }}
+--dry-run={{ docker_registry_garbage_collect_dry_run | to_json }} \
+--delete-untagged

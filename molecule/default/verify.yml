@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Suguru Hirahara
+# SPDX-FileCopyrightText: 2026 spatterlight
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+- name: Verify Docker Registry systemd service
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wait for Docker Registry service to become active (up to 180s)
+      ansible.builtin.systemd:
+        name: docker-registry.service
+      register: docker_registry_service
+      until: docker_registry_service.status.ActiveState == 'active'
+      retries: 36
+      delay: 5
+
+    - name: Assert Docker Registry service is active
+      ansible.builtin.assert:
+        that: docker_registry_service.status.ActiveState == 'active'
+        fail_msg: "docker-registry.service not active ({{ docker_registry_service.status.ActiveState }})"
+        success_msg: "docker-registry.service is active"
+
+    - name: Retrieve Docker Registry service log for debugging
+      when: docker_registry_debug_service_enabled | bool
+      ansible.builtin.command:
+        cmd: journalctl -xeu docker-registry.service
+      changed_when: false
+
+    - name: Wait for Docker Registry HTTP endpoint to respond (up to 10m)
+      ansible.builtin.uri:
+        url: "http://localhost:5000/"
+        method: GET
+        status_code: [200, 301, 302]
+        follow_redirects: none
+      register: docker_registry_endpoint
+      until: docker_registry_endpoint.status in [200, 301, 302]
+      retries: 120
+      delay: 5
+
+    - name: Assert Docker Registry HTTP endpoint responds
+      ansible.builtin.assert:
+        that: docker_registry_endpoint.status in [200, 301, 302]
+        fail_msg: "Docker Registry did not respond as expected ({{ docker_registry_endpoint.status | default('no response') }})"
+        success_msg: "Docker Registry responded with {{ docker_registry_endpoint.status }}"
+
+    - name: Show Docker Registry systemd service status summary
+      ansible.builtin.debug:
+        msg:
+          - "Docker Registry systemd: {{ docker_registry_service.status.ActiveState }}"
+          - "Docker Registry HTTP: {{ docker_registry_endpoint.status }}"

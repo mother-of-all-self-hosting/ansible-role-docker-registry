@@ -1,53 +1,422 @@
 # SPDX-FileCopyrightText: 2026 Suguru Hirahara
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-- name: Verify Docker Registry systemd service
+- name: Verify Docker Registry
   hosts: all
   become: true
   gather_facts: false
   tasks:
-    - name: Wait for Docker Registry service to become active (up to 180s)
+    # Role defaults are not in scope here, but the version that Renovate bumps
+    # lives in them and is what the running registry is checked against below.
+    - name: Load the Docker Registry role defaults
+      ansible.builtin.include_vars:
+        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+        name: docker_registry_defaults
+
+    - name: Read what converge.yml recorded
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      register: docker_registry_reports
+      loop:
+        - /root/pre-role-state.json
+        - "{{ docker_registry_molecule_control_report_path }}"
+        - "{{ docker_registry_molecule_report_path_delete_disabled }}"
+        - "{{ docker_registry_molecule_report_path_delete_enabled }}"
+
+    - name: Make sense of what converge.yml recorded
+      ansible.builtin.set_fact:
+        docker_registry_pre_role: "{{ docker_registry_reports.results[0].content | b64decode | from_json }}"
+        docker_registry_control: "{{ docker_registry_reports.results[1].content | b64decode | from_json }}"
+        docker_registry_delete_disabled: "{{ docker_registry_reports.results[2].content | b64decode | from_json }}"
+        docker_registry_delete_enabled: "{{ docker_registry_reports.results[3].content | b64decode | from_json }}"
+
+    # ---------------------------------------------------------------------
+    # The baseline: none of what follows was already true
+    # ---------------------------------------------------------------------
+
+    - name: Assert nothing was serving a registry before the role ran
+      ansible.builtin.assert:
+        that:
+          - not docker_registry_pre_role.data_path_exists
+          - not docker_registry_pre_role.port_answered
+        fail_msg: >-
+          The host already had a registry before the role ran, so nothing below
+          can be attributed to the role: {{ docker_registry_pre_role }}
+        success_msg: "Neither the data path nor the registry port existed before the role ran"
+
+    # ---------------------------------------------------------------------
+    # The negative control: what the stock image gives you without the role
+    # ---------------------------------------------------------------------
+
+    # The image alone is already a working registry. Saying so explicitly is
+    # what keeps the assertions further down honest: only the ones that differ
+    # from the control are the role's doing.
+    - name: Assert the stock container image serves a registry on its own
+      ansible.builtin.assert:
+        that:
+          - docker_registry_control.manifest_get.status == 200
+          - docker_registry_control.manifest_get.digest_matches_body
+          - docker_registry_control.blob_get.layer.digest_matches
+        fail_msg: "The stock container image did not serve a round trip: {{ docker_registry_control }}"
+        success_msg: >-
+          The stock container image serves a registry unaided, so a working
+          registry is not by itself evidence that the role did anything
+
+    - name: Assert the stock container image refuses deletion
+      ansible.builtin.assert:
+        that: docker_registry_control.delete.status == 405
+        fail_msg: >-
+          The stock container image allowed deletion ({{ docker_registry_control.delete.status }}),
+          so the role's deletion assertions below prove nothing
+        success_msg: >-
+          The stock container image refuses deletion with 405, so a registry
+          that accepts it can only have been configured to
+
+    # ---------------------------------------------------------------------
+    # The unit is up and the registry API - not merely some HTTP server - answers
+    # ---------------------------------------------------------------------
+
+    - name: Read the Docker Registry service state
       ansible.builtin.systemd:
         name: docker-registry.service
       register: docker_registry_service
-      until: docker_registry_service.status.ActiveState == 'active'
-      retries: 36
-      delay: 5
 
-    - name: Assert Docker Registry service is active
+    - name: Assert the Docker Registry service is active
       ansible.builtin.assert:
         that: docker_registry_service.status.ActiveState == 'active'
-        fail_msg: "docker-registry.service not active ({{ docker_registry_service.status.ActiveState }})"
+        fail_msg: "docker-registry.service is not active ({{ docker_registry_service.status.ActiveState }})"
         success_msg: "docker-registry.service is active"
 
-    - name: Retrieve Docker Registry service log for debugging
+    - name: Retrieve the Docker Registry service log for debugging
       when: docker_registry_debug_service_enabled | bool
       ansible.builtin.command:
-        cmd: journalctl -xeu docker-registry.service
+        argv:
+          - journalctl
+          - --no-pager
+          - --output=cat
+          - --unit=docker-registry.service
       changed_when: false
 
-    - name: Wait for Docker Registry HTTP endpoint to respond (up to 10m)
+    # `/` answers 200 with an empty body on any registry, so hitting it proves
+    # only that something is listening. `/v2/` is the API root, and the
+    # `Docker-Distribution-Api-Version` header it carries is what a Docker
+    # client uses to decide it is talking to a registry at all.
+    - name: Query the Docker Registry API root
       ansible.builtin.uri:
-        url: "http://localhost:5000/"
-        method: GET
-        status_code: [200, 301, 302]
-        follow_redirects: none
-      register: docker_registry_endpoint
-      until: docker_registry_endpoint.status in [200, 301, 302]
-      retries: 120
-      delay: 5
+        url: "{{ docker_registry_molecule_registry_url }}/v2/"
+      register: docker_registry_api_root
 
-    - name: Assert Docker Registry HTTP endpoint responds
+    - name: Assert the Docker Registry API root identifies itself as a registry
       ansible.builtin.assert:
-        that: docker_registry_endpoint.status in [200, 301, 302]
-        fail_msg: "Docker Registry did not respond as expected ({{ docker_registry_endpoint.status | default('no response') }})"
-        success_msg: "Docker Registry responded with {{ docker_registry_endpoint.status }}"
+        that:
+          - docker_registry_api_root.status == 200
+          - docker_registry_api_root.docker_distribution_api_version == 'registry/2.0'
+        fail_msg: "The registry API root did not identify itself: {{ docker_registry_api_root }}"
+        success_msg: >-
+          The registry API root answers 200 and reports
+          {{ docker_registry_api_root.docker_distribution_api_version }}
 
-    - name: Show Docker Registry systemd service status summary
+    # ---------------------------------------------------------------------
+    # A push/pull round trip, verified by digest
+    # ---------------------------------------------------------------------
+
+    # A content-addressed store that hands back the wrong bytes cannot pass
+    # this: every digest below is recomputed from what the registry returned.
+    - name: Assert the Docker Registry served a push/pull round trip
+      ansible.builtin.assert:
+        that:
+          - docker_registry_delete_disabled.manifest_get.status == 200
+          - docker_registry_delete_disabled.manifest_get.digest_matches_body
+          - docker_registry_delete_disabled.manifest_get.digest_matches_pushed
+          - >-
+            docker_registry_delete_disabled.manifest_get.media_type
+            == 'application/vnd.docker.distribution.manifest.v2+json'
+          - docker_registry_delete_disabled.blob_get.config.status == 200
+          - docker_registry_delete_disabled.blob_get.config.digest_matches
+          - docker_registry_delete_disabled.blob_get.layer.status == 200
+          - docker_registry_delete_disabled.blob_get.layer.digest_matches
+        fail_msg: "The round trip did not come back intact: {{ docker_registry_delete_disabled }}"
+        success_msg: >-
+          {{ docker_registry_molecule_repository }}:{{ docker_registry_molecule_tag_delete_disabled }}
+          was pushed and read back with every digest matching
+
+    - name: Query the Docker Registry tag list
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_registry_url }}/v2/{{ docker_registry_molecule_repository }}/tags/list"
+        return_content: true
+      register: docker_registry_tag_list
+
+    - name: Assert the Docker Registry lists the pushed tag
+      ansible.builtin.assert:
+        that: docker_registry_molecule_tag_delete_disabled in docker_registry_tag_list.json.tags
+        fail_msg: "The pushed tag is not listed: {{ docker_registry_tag_list.json }}"
+        success_msg: "The registry lists {{ docker_registry_tag_list.json.tags | sort }}"
+
+    # ---------------------------------------------------------------------
+    # The blobs landed on the role's bind-mounted storage path, on the host
+    # ---------------------------------------------------------------------
+
+    # The registry answering over HTTP says nothing about *where* it put the
+    # bytes. The role bind-mounts its own data path into the container, so what
+    # was pushed has to be visible on the host, at the content-addressed
+    # location the storage driver uses.
+    - name: Stat the pushed layer blob on the Docker Registry storage path
+      ansible.builtin.stat:
+        path: >-
+          {{ docker_registry_data_path }}/docker/registry/v2/blobs/sha256/{{
+          (docker_registry_delete_disabled.pushed.layer_digest | replace('sha256:', ''))[0:2]
+          }}/{{ docker_registry_delete_disabled.pushed.layer_digest | replace('sha256:', '') }}/data
+      register: docker_registry_layer_blob_on_disk
+
+    - name: Stat the pushed tag on the Docker Registry storage path
+      ansible.builtin.stat:
+        path: >-
+          {{ docker_registry_data_path }}/docker/registry/v2/repositories/{{
+          docker_registry_molecule_repository }}/_manifests/tags/{{
+          docker_registry_molecule_tag_delete_disabled }}
+      register: docker_registry_tag_on_disk
+
+    - name: Assert what was pushed is on the host at the role's storage path
+      ansible.builtin.assert:
+        that:
+          - docker_registry_layer_blob_on_disk.stat.exists
+          - docker_registry_layer_blob_on_disk.stat.size == docker_registry_delete_disabled.pushed.layer_size
+          - docker_registry_tag_on_disk.stat.exists
+          - docker_registry_tag_on_disk.stat.isdir
+        fail_msg: >-
+          What was pushed did not land under {{ docker_registry_data_path }}
+          (blob: {{ docker_registry_layer_blob_on_disk.stat.exists }},
+          tag: {{ docker_registry_tag_on_disk.stat.exists }})
+        success_msg: >-
+          The pushed layer is on the host under {{ docker_registry_data_path }},
+          {{ docker_registry_layer_blob_on_disk.stat.size }} bytes, at its own digest
+
+    # ---------------------------------------------------------------------
+    # `docker_registry_storage_delete_enabled` reaches the running process
+    # ---------------------------------------------------------------------
+
+    - name: Read the Docker Registry environment file
+      ansible.builtin.slurp:
+        src: "{{ docker_registry_base_path }}/env"
+      register: docker_registry_env_file
+
+    - name: Make sense of the Docker Registry environment file
+      ansible.builtin.set_fact:
+        docker_registry_env_lines: "{{ (docker_registry_env_file.content | b64decode).splitlines() }}"
+
+    - name: Assert the configured settings reached the Docker Registry env file
+      ansible.builtin.assert:
+        that:
+          # The second installation pass turned deletion on; had it not, the
+          # deletion below could not have succeeded.
+          - "'REGISTRY_STORAGE_DELETE_ENABLED=True' in docker_registry_env_lines"
+          - "'TZ=' ~ docker_registry_defaults.docker_registry_environment_variables_tz in docker_registry_env_lines"
+        fail_msg: "The configured settings did not reach the env file: {{ docker_registry_env_lines }}"
+        success_msg: "The configured settings reached the env file"
+
+    # The env file is read when the container is created, so this is the half
+    # that shows the setting actually took effect in the process: the same
+    # request that the stock image and the first pass both refused with 405 is
+    # now accepted.
+    - name: Assert deletion is refused when disabled and accepted when enabled
+      ansible.builtin.assert:
+        that:
+          - docker_registry_delete_disabled.delete.status == 405
+          - "'UNSUPPORTED' in docker_registry_delete_disabled.delete.body"
+          - docker_registry_delete_enabled.delete.status == 202
+        fail_msg: >-
+          Deletion did not follow docker_registry_storage_delete_enabled
+          (disabled: {{ docker_registry_delete_disabled.delete.status }},
+          enabled: {{ docker_registry_delete_enabled.delete.status }})
+        success_msg: >-
+          Deletion is refused with 405 while docker_registry_storage_delete_enabled
+          is false and accepted with 202 once it is true
+
+    - name: Query the Docker Registry tag list after the deletion
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_registry_url }}/v2/{{ docker_registry_molecule_repository }}/tags/list"
+        return_content: true
+      register: docker_registry_tag_list_after
+
+    - name: Assert the deletion removed only the tag it was aimed at
+      ansible.builtin.assert:
+        that:
+          - docker_registry_molecule_tag_delete_enabled not in (docker_registry_tag_list_after.json.tags | default([]))
+          - docker_registry_molecule_tag_delete_disabled in (docker_registry_tag_list_after.json.tags | default([]))
+        fail_msg: "The deletion did not remove what it should have: {{ docker_registry_tag_list_after.json }}"
+        success_msg: >-
+          The deleted tag is gone and
+          {{ docker_registry_molecule_tag_delete_disabled }} is untouched
+
+    # ---------------------------------------------------------------------
+    # The version that is running is the one the role asks for
+    # ---------------------------------------------------------------------
+
+    # The registry exposes no version endpoint, and its container image carries
+    # no labels at all (checked against registry:2.8.3 and registry:3.0.0), so
+    # neither the API nor `docker inspect` can answer this. The binary itself
+    # can, and reports the real release rather than a placeholder:
+    # `/bin/registry github.com/docker/distribution 2.8.3`.
+    - name: Ask the running Docker Registry which version it is
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - docker-registry
+          - /bin/registry
+          - --version
+      register: docker_registry_running_version
+      changed_when: false
+
+    - name: Assert the running Docker Registry is the version the role asks for
+      ansible.builtin.assert:
+        that: >-
+          (docker_registry_running_version.stdout | trim | split(' ') | last)
+          == docker_registry_defaults.docker_registry_version
+        fail_msg: >-
+          The running registry is not {{ docker_registry_defaults.docker_registry_version }}:
+          {{ docker_registry_running_version.stdout }}
+        success_msg: >-
+          The running registry reports
+          {{ docker_registry_running_version.stdout | trim | split(' ') | last }},
+          which is docker_registry_version
+
+    # ---------------------------------------------------------------------
+    # The container is created the way the role's variables describe
+    # ---------------------------------------------------------------------
+
+    - name: Inspect the Docker Registry container
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - docker-registry
+      register: docker_registry_container_inspect
+      changed_when: false
+
+    - name: Make sense of the Docker Registry container inspection
+      ansible.builtin.set_fact:
+        docker_registry_container: "{{ (docker_registry_container_inspect.stdout | from_json)[0] }}"
+
+    - name: Assert the Docker Registry container is created as configured
+      ansible.builtin.assert:
+        that:
+          - docker_registry_container.HostConfig.ReadonlyRootfs
+          - "'ALL' in docker_registry_container.HostConfig.CapDrop"
+          - docker_registry_container.Config.User == '1000:1000'
+          - >-
+            docker_registry_container.Mounts
+            | selectattr('Destination', 'equalto', '/var/lib/registry')
+            | map(attribute='Source') | list == [docker_registry_data_path]
+          - docker_registry_container_network in docker_registry_container.NetworkSettings.Networks
+        fail_msg: "The container is not created as configured: {{ docker_registry_container.HostConfig }}"
+        success_msg: >-
+          The container is read-only, drops all capabilities, runs as
+          {{ docker_registry_container.Config.User }}, and bind-mounts
+          {{ docker_registry_data_path }} at /var/lib/registry
+
+    # ---------------------------------------------------------------------
+    # Garbage collection is something the kernel will actually execute
+    # ---------------------------------------------------------------------
+
+    - name: Stat the Docker Registry garbage collection script
+      ansible.builtin.stat:
+        path: "{{ docker_registry_bin_path }}/garbage-collect"
+      register: docker_registry_gc_script_stat
+
+    - name: Read the Docker Registry garbage collection script
+      ansible.builtin.slurp:
+        src: "{{ docker_registry_bin_path }}/garbage-collect"
+      register: docker_registry_gc_script
+
+    - name: Make sense of the Docker Registry garbage collection script
+      ansible.builtin.set_fact:
+        docker_registry_gc_script_lines: "{{ (docker_registry_gc_script.content | b64decode).splitlines() }}"
+
+    # An executable whose first line is not a shebang is rejected by the kernel
+    # with ENOEXEC. Interactive shells paper over that by falling back to
+    # /bin/sh, but systemd - the only thing that ever runs this script - does
+    # not, and reports 203/EXEC instead.
+    - name: Assert the Docker Registry garbage collection script is executable and wired as configured
+      ansible.builtin.assert:
+        that:
+          - docker_registry_gc_script_stat.stat.exists
+          - docker_registry_gc_script_stat.stat.mode == '0750'
+          - docker_registry_gc_script_lines[0] == '#!/bin/bash'
+          - >-
+            docker_registry_gc_script_lines
+            | select('search', 'registry:' ~ docker_registry_defaults.docker_registry_version)
+            | list | length > 0
+          - >-
+            docker_registry_gc_script_lines
+            | select('search', 'src=' ~ docker_registry_data_path ~ ',dst=/var/lib/registry')
+            | list | length > 0
+        fail_msg: "The garbage collection script is not what it should be: {{ docker_registry_gc_script_lines }}"
+        success_msg: >-
+          The garbage collection script starts with a shebang and runs
+          registry:{{ docker_registry_defaults.docker_registry_version }}
+          against {{ docker_registry_data_path }}
+
+    - name: Determine the Docker Registry garbage collection unit paths
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - show
+          - --property=FragmentPath
+          - --value
+          - "docker-registry-garbage-collect.{{ item }}"
+      register: docker_registry_gc_unit_paths
+      changed_when: false
+      loop:
+        - service
+        - timer
+
+    - name: Read the Docker Registry garbage collection units
+      ansible.builtin.slurp:
+        src: "{{ item.stdout | trim }}"
+      register: docker_registry_gc_units
+      loop: "{{ docker_registry_gc_unit_paths.results }}"
+      loop_control:
+        label: "{{ item.stdout | trim }}"
+
+    - name: Make sense of the Docker Registry garbage collection units
+      ansible.builtin.set_fact:
+        docker_registry_gc_service_lines: "{{ (docker_registry_gc_units.results[0].content | b64decode).splitlines() }}"
+        docker_registry_gc_timer_lines: "{{ (docker_registry_gc_units.results[1].content | b64decode).splitlines() }}"
+
+    - name: Assert the Docker Registry garbage collection units are wired as configured
+      ansible.builtin.assert:
+        that:
+          # A one-shot, so that a collection is something that completes rather
+          # than something that stays up.
+          - "'Type=oneshot' in docker_registry_gc_service_lines"
+          - "'ExecStart=' ~ docker_registry_bin_path ~ '/garbage-collect' in docker_registry_gc_service_lines"
+          - "'Unit=docker-registry-garbage-collect.service' in docker_registry_gc_timer_lines"
+          - "'OnCalendar=' ~ docker_registry_garbage_collect_schedule in docker_registry_gc_timer_lines"
+        fail_msg: >-
+          The garbage collection units are not wired as configured:
+          {{ docker_registry_gc_service_lines }} / {{ docker_registry_gc_timer_lines }}
+        success_msg: >-
+          docker-registry-garbage-collect.timer runs
+          docker-registry-garbage-collect.service on
+          {{ docker_registry_garbage_collect_schedule }}, which runs the
+          garbage collection script
+
+    - name: Show the Docker Registry verification summary
       ansible.builtin.debug:
         msg:
-          - "Docker Registry systemd: {{ docker_registry_service.status.ActiveState }}"
-          - "Docker Registry HTTP: {{ docker_registry_endpoint.status }}"
+          - "Service: {{ docker_registry_service.status.ActiveState }}"
+          - "API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
+          - "Running version: {{ docker_registry_running_version.stdout | trim }}"
+          - "Round trip: manifest {{ docker_registry_delete_disabled.manifest_get.digest_header }}"
+          - "Layer on host: {{ docker_registry_layer_blob_on_disk.stat.size }} bytes under {{ docker_registry_data_path }}"
+          - >-
+            Deletion: {{ docker_registry_delete_disabled.delete.status }} when disabled,
+            {{ docker_registry_delete_enabled.delete.status }} when enabled
+            (stock image: {{ docker_registry_control.delete.status }})
+          - "Tags now: {{ docker_registry_tag_list_after.json.tags | default([]) | sort }}"
+          - "GC script: {{ docker_registry_gc_script_lines[0] }} ({{ docker_registry_gc_script_stat.stat.mode }})"

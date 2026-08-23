@@ -1,35 +1,214 @@
 # SPDX-FileCopyrightText: 2026 Suguru Hirahara
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-- name: Include roles for Docker Registry Molecule tests
+# Everything that needs the supporting roles' variables in scope lives in this
+# one play, because `public: true` exposes them to the rest of the play only.
+- name: Install and exercise Docker Registry for Molecule tests
   hosts: all
   become: true
   gather_facts: true
   tasks:
-    - name: Include roles for Docker Registry Molecule tests
+    - name: Include supporting roles for Docker Registry Molecule tests
       ansible.builtin.include_role:
         name: "{{ role_name }}"
         public: true
       loop:
         - com.devture.ansible.role.playbook_help
         - com.devture.ansible.role.systemd_docker_base
-        - "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
       loop_control:
         loop_var: role_name
 
-- name: Ensure Docker Registry service is started
-  hosts: all
-  become: true
-  gather_facts: false
-  tasks:
-    - name: Ensure systemd daemon is reloaded
-      ansible.builtin.systemd_service:
-        daemon_reload: true
+    # Role defaults are not in scope here, but the version Renovate bumps lives
+    # in them, and the negative control below has to run the very same image
+    # the role is about to run.
+    - name: Load the Docker Registry role defaults
+      ansible.builtin.include_vars:
+        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+        name: docker_registry_defaults
 
-    - name: Ensure Docker Registry systemd service is started
+    - name: Ensure the Docker Registry round trip script is present
+      ansible.builtin.copy:
+        src: roundtrip-registry.py
+        dest: /var/tmp/roundtrip-registry.py
+        mode: "0755"
+
+    # -----------------------------------------------------------------
+    # What the host looked like before the role touched it
+    # -----------------------------------------------------------------
+
+    # Recorded rather than asserted here, so that every assertion lives in
+    # verify.yml. Without this, an assertion that the role's port answers and
+    # its data path holds blobs could just as well be describing something that
+    # was already there.
+    - name: Stat the Docker Registry data path before the role runs
+      ansible.builtin.stat:
+        path: "{{ docker_registry_data_path }}"
+      register: docker_registry_molecule_data_path_before
+
+    - name: Determine whether anything answers on the Docker Registry port before the role runs
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_registry_url }}/v2/"
+      register: docker_registry_molecule_port_before
+      failed_when: false
+
+    - name: Record what the host looked like before the role ran
+      ansible.builtin.copy:
+        dest: /root/pre-role-state.json
+        mode: "0644"
+        content: |
+          {{
+            {
+              'data_path_exists': docker_registry_molecule_data_path_before.stat.exists,
+              'port_answered': (docker_registry_molecule_port_before.status | default(-1)) == 200,
+            } | to_nice_json
+          }}
+
+    # -----------------------------------------------------------------
+    # Negative control: the stock image, with no role involvement at all
+    # -----------------------------------------------------------------
+
+    # The image on its own is a working registry, so a test that only checks
+    # "a registry answers" would pass without the role having done anything.
+    # Running the stock image here, unconfigured, pins down what the image
+    # gives you for free - and therefore what verify.yml may credit the role
+    # with. Deletion is the sharpest of those: the image refuses it by default,
+    # so the 202 the role's second pass gets can only come from the role's env
+    # file.
+    #
+    # Started via the Docker CLI rather than community.docker.docker_container,
+    # because the ansible-lint environment used by pre-commit does not have the
+    # community.docker collection and would fail the playbook syntax check.
+    - name: Ensure the stock Docker Registry container image is pulled
+      ansible.builtin.command:
+        argv:
+          - docker
+          - pull
+          - "docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
+      changed_when: true
+
+    - name: Ensure the standalone Docker Registry control container is running
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - -d
+          - --name
+          - "{{ docker_registry_molecule_control_container_name }}"
+          - -p
+          - "127.0.0.1:5099:5000"
+          - "docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
+      changed_when: true
+
+    - name: Wait for the standalone Docker Registry control container to answer (up to 60s)
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_control_url }}/v2/"
+      register: docker_registry_molecule_control_ping
+      until: docker_registry_molecule_control_ping is not failed
+      retries: 12
+      delay: 5
+
+    - name: Run a round trip against the standalone Docker Registry control container
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /var/tmp/roundtrip-registry.py
+          - "{{ docker_registry_molecule_control_url }}"
+          - "{{ docker_registry_molecule_repository }}"
+          - control
+      register: docker_registry_molecule_control_roundtrip
+      changed_when: true
+
+    - name: Record the standalone Docker Registry control round trip
+      ansible.builtin.copy:
+        dest: "{{ docker_registry_molecule_control_report_path }}"
+        content: "{{ docker_registry_molecule_control_roundtrip.stdout }}"
+        mode: "0644"
+
+    # -----------------------------------------------------------------
+    # First pass: the role's own default, which refuses deletion
+    # -----------------------------------------------------------------
+
+    - name: Include the Docker Registry role
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
+
+    - name: Ensure the Docker Registry systemd service is started
       ansible.builtin.systemd_service:
         name: docker-registry.service
         state: started
+        daemon_reload: true
+
+    - name: Wait for the Docker Registry API to answer (up to 300s)
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_registry_url }}/v2/"
+      register: docker_registry_molecule_ping
+      until: docker_registry_molecule_ping is not failed
+      retries: 60
+      delay: 5
+
+    - name: Run a round trip against Docker Registry with deletion disabled
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /var/tmp/roundtrip-registry.py
+          - "{{ docker_registry_molecule_registry_url }}"
+          - "{{ docker_registry_molecule_repository }}"
+          - "{{ docker_registry_molecule_tag_delete_disabled }}"
+      register: docker_registry_molecule_roundtrip_delete_disabled
+      changed_when: true
+
+    - name: Record the Docker Registry round trip with deletion disabled
+      ansible.builtin.copy:
+        dest: "{{ docker_registry_molecule_report_path_delete_disabled }}"
+        content: "{{ docker_registry_molecule_roundtrip_delete_disabled.stdout }}"
+        mode: "0644"
+
+    # -----------------------------------------------------------------
+    # Second pass: deletion turned on, to show the knob reaches the process
+    # -----------------------------------------------------------------
+
+    # Not public, so the override stays scoped to this include. Only the env
+    # file changes, which makes this a test of the role's env file rather than
+    # of anything Molecule does directly.
+    - name: Include the Docker Registry role with deletion enabled
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
+      vars:
+        docker_registry_storage_delete_enabled: true
+
+    # The env file is only read when the container is created, so the running
+    # process keeps the old setting until the service is restarted.
+    - name: Ensure the Docker Registry systemd service is restarted
+      ansible.builtin.systemd_service:
+        name: docker-registry.service
+        state: restarted
+        daemon_reload: true
+
+    - name: Wait for the Docker Registry API to answer again (up to 300s)
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_registry_url }}/v2/"
+      register: docker_registry_molecule_ping_again
+      until: docker_registry_molecule_ping_again is not failed
+      retries: 60
+      delay: 5
+
+    - name: Run a round trip against Docker Registry with deletion enabled
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /var/tmp/roundtrip-registry.py
+          - "{{ docker_registry_molecule_registry_url }}"
+          - "{{ docker_registry_molecule_repository }}"
+          - "{{ docker_registry_molecule_tag_delete_enabled }}"
+      register: docker_registry_molecule_roundtrip_delete_enabled
+      changed_when: true
+
+    - name: Record the Docker Registry round trip with deletion enabled
+      ansible.builtin.copy:
+        dest: "{{ docker_registry_molecule_report_path_delete_enabled }}"
+        content: "{{ docker_registry_molecule_roundtrip_delete_enabled.stdout }}"
+        mode: "0644"

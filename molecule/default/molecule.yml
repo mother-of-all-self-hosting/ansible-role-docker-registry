@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Suguru Hirahara
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -31,6 +32,27 @@ provisioner:
         # Helper variables
         docker_registry_debug_service_enabled: false
 
+        # Where the registry is reachable from inside the Molecule container.
+        docker_registry_molecule_registry_url: "http://127.0.0.1:5000"
+
+        # The stock container image, run with no role involvement at all, as a
+        # negative control: it establishes which of the assertions in
+        # verify.yml are the role's doing rather than the image's.
+        docker_registry_molecule_control_container_name: docker-registry-default-standalone-control
+        docker_registry_molecule_control_url: "http://127.0.0.1:5099"
+        docker_registry_molecule_control_report_path: /root/roundtrip-standalone-control.json
+
+        # What the round trip pushes. Each pass uses a tag of its own, so that
+        # the image the first pass pushed is still there to be looked at after
+        # the second pass has deleted its own.
+        docker_registry_molecule_repository: mash/molecule-probe
+        docker_registry_molecule_tag_delete_disabled: delete-disabled
+        docker_registry_molecule_tag_delete_enabled: delete-enabled
+
+        # Where converge.yml leaves the round trip reports for verify.yml.
+        docker_registry_molecule_report_path_delete_disabled: /root/roundtrip-delete-disabled.json
+        docker_registry_molecule_report_path_delete_enabled: /root/roundtrip-delete-enabled.json
+
         # Variables for Docker Registry
         docker_registry_enabled: true  # Because it is disabled by default
         docker_registry_identifier: docker-registry  # The default value is `container-registry`
@@ -46,8 +68,41 @@ provisioner:
           - 10.0.0.0/8
           - 172.16.0.0/12
           - 192.168.0.0/16
+
+        # Deliberately different from the role's own default
+        # ('Sunday *-*-* 08:30:00'), so that verify.yml can tell that this knob
+        # is what actually reached the timer rather than something that
+        # happened to agree with it.
+        docker_registry_garbage_collect_schedule: "Tuesday *-*-* 03:17:00"
+
+        # Pinned to literal values, because verify.yml runs as a separate play,
+        # where the role's defaults are out of scope, and these are derived
+        # from other variables rather than being literals themselves.
+        docker_registry_base_path: /registry
+        docker_registry_data_path: /registry/data
+        docker_registry_bin_path: /registry/bin
+        docker_registry_container_network: docker-registry
   env:
     # Workaround for https://github.com/ansible/molecule/issues/4391
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..:/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles:~/.ansible/roles
+scenario:
+  # See: https://docs.ansible.com/projects/molecule/configuration/?h=test_sequence#scenario
+  #
+  # Idempotence is left out: converge records what the host looked like before
+  # the role ran, starts a control container, pushes images and installs the
+  # role twice with different settings, none of which is a no-op on a second
+  # run.
+  test_sequence:
+    - dependency
+    - cleanup
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - side_effect
+    - verify
+    - cleanup
+    - destroy
 verifier:
   name: ansible

@@ -49,9 +49,17 @@ Currently these testing scenarios are available:
 
 Tests a standard Docker Registry installation.
 
+Before the role runs, the scenario records that the host has no registry, and starts the stock container image unconfigured as a negative control, so that what the image provides on its own is not credited to the role.
+
+It then checks that the systemd service is active, that `/v2/` identifies itself as a registry, and that a container image can be pushed and read back with every digest matching — over the registry HTTP API rather than with `docker push`, so that the result does not depend on the Docker version the test runs against. The pushed blob is then located on the host, under the role's bind-mounted data path.
+
+The role is installed twice, with `docker_registry_storage_delete_enabled` off and then on, to show that the setting reaches the running process: the same deletion is refused with `405` and then accepted with `202`. Finally the running version is compared against `docker_registry_version`, and the garbage collection script and its timer are checked.
+
 ### `default-selfbuild`
 
 Tests a standard Docker Registry installation with self-building the container image.
+
+Since the `default` scenario covers the registry's behavior, this one checks what is peculiar to self-building: that the service runs the locally built image, and that this image carries no repository digest — which an image pulled from a registry always does, and one built here never can.
 
 ## Running
 

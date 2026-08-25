@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+---
+# The configuration file for the standalone negative-control registry that
+# `converge.yml` starts alongside the role's own.
+#
+# The control exists to say what a registry does *without* the role, so that
+# `verify.yml` only credits the role with the difference. It deliberately does
+# not use the configuration file that the container image bundles: that file is
+# a property of how the image is packaged rather than of the registry, and it
+# changes between releases. Docker Registry 2.8.3's bundled file said nothing
+# about `storage.delete` while v3's turns deletion on, which silently turned the
+# control from "the image refuses deletion" into "the image allows deletion".
+#
+# What is written here is the smallest configuration a registry will start with.
+# In particular it says nothing about `storage.delete`, so the registry falls
+# back to its own compiled-in default - and *that* default, rather than any
+# image's packaging, is what the control pins down.
+version: 0.1
+log:
+  level: info
+  fields:
+    service: registry-molecule-control
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+http:
+  addr: :5000
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3

@@ -24,6 +24,8 @@
       loop:
         - /root/pre-role-state.json
         - "{{ docker_registry_molecule_control_report_path }}"
+        - /root/seed-state.json
+        - "{{ docker_registry_molecule_report_path_seeded }}"
         - "{{ docker_registry_molecule_report_path_delete_disabled }}"
         - "{{ docker_registry_molecule_report_path_delete_enabled }}"
 
@@ -31,8 +33,10 @@
       ansible.builtin.set_fact:
         docker_registry_pre_role: "{{ docker_registry_reports.results[0].content | b64decode | from_json }}"
         docker_registry_control: "{{ docker_registry_reports.results[1].content | b64decode | from_json }}"
-        docker_registry_delete_disabled: "{{ docker_registry_reports.results[2].content | b64decode | from_json }}"
-        docker_registry_delete_enabled: "{{ docker_registry_reports.results[3].content | b64decode | from_json }}"
+        docker_registry_seed_state: "{{ docker_registry_reports.results[2].content | b64decode | from_json }}"
+        docker_registry_seeded: "{{ docker_registry_reports.results[3].content | b64decode | from_json }}"
+        docker_registry_delete_disabled: "{{ docker_registry_reports.results[4].content | b64decode | from_json }}"
+        docker_registry_delete_enabled: "{{ docker_registry_reports.results[5].content | b64decode | from_json }}"
 
     # ---------------------------------------------------------------------
     # The baseline: none of what follows was already true
@@ -49,7 +53,7 @@
         success_msg: "Neither the data path nor the registry port existed before the role ran"
 
     # ---------------------------------------------------------------------
-    # The negative control: what the stock image gives you without the role
+    # The negative control: what the registry gives you without the role
     # ---------------------------------------------------------------------
 
     # The image alone is already a working registry. Saying so explicitly is
@@ -66,15 +70,25 @@
           The stock container image serves a registry unaided, so a working
           registry is not by itself evidence that the role did anything
 
-    - name: Assert the stock container image refuses deletion
+    # The control runs on molecule/default/files/control-config.yml, which says
+    # nothing about `storage.delete`, so what is measured here is the
+    # registry's own compiled-in default rather than whatever the container
+    # image happens to bundle. That distinction is not academic: this control
+    # used to run on the image's bundled configuration file, and Docker
+    # Registry v3 turned deletion on in it, which turned the control from a
+    # statement about the registry into a statement about packaging - and made
+    # it fail on the upgrade for a reason that had nothing to do with the role.
+    - name: Assert a registry told nothing about deletion refuses it
       ansible.builtin.assert:
         that: docker_registry_control.delete.status == 405
         fail_msg: >-
-          The stock container image allowed deletion ({{ docker_registry_control.delete.status }}),
-          so the role's deletion assertions below prove nothing
+          A registry whose configuration file says nothing about storage.delete
+          allowed deletion ({{ docker_registry_control.delete.status }}), so the
+          role's deletion assertions below prove nothing
         success_msg: >-
-          The stock container image refuses deletion with 405, so a registry
-          that accepts it can only have been configured to
+          A registry whose configuration file says nothing about storage.delete
+          refuses deletion with 405, so a registry that accepts it can only
+          have been configured to
 
     # ---------------------------------------------------------------------
     # The unit is up and the registry API - not merely some HTTP server - answers
@@ -215,13 +229,69 @@
           # deletion below could not have succeeded.
           - "'REGISTRY_STORAGE_DELETE_ENABLED=True' in docker_registry_env_lines"
           - "'TZ=' ~ docker_registry_defaults.docker_registry_environment_variables_tz in docker_registry_env_lines"
+          - "'REGISTRY_LOG_LEVEL=' ~ docker_registry_defaults.docker_registry_log_level in docker_registry_env_lines"
+          # An empty value is the point: it is what keeps the debug listener closed.
+          - "'REGISTRY_HTTP_DEBUG_ADDR=' ~ docker_registry_defaults.docker_registry_http_debug_addr in docker_registry_env_lines"
+          - >-
+            docker_registry_env_lines
+            | select('search', '^REGISTRY_HTTP_HEADERS=.*nosniff')
+            | list | length == 1
         fail_msg: "The configured settings did not reach the env file: {{ docker_registry_env_lines }}"
         success_msg: "The configured settings reached the env file"
 
+    # ---------------------------------------------------------------------
+    # The role's env file outranks the configuration file inside the image
+    # ---------------------------------------------------------------------
+
+    # The registry is configured by a file that lives inside the container
+    # image, which the role never writes and cannot see - it only sets
+    # environment variables, which the registry applies on top of that file.
+    # Reading the file back out of the running container is what turns the
+    # deletion assertions below from "the setting agrees with the image" into
+    # "the setting overrides the image".
+    #
+    # It doubles as the test for docker_registry_container_config_path, which
+    # is the one thing the v2 -> v3 upgrade genuinely broke: the file moved
+    # from /etc/docker/registry/config.yml to /etc/distribution/config.yml.
+    - name: Read the configuration file bundled inside the Docker Registry container image
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - docker-registry
+          - cat
+          - "{{ docker_registry_defaults.docker_registry_container_config_path }}"
+      register: docker_registry_bundled_config_raw
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the container image's configuration file is where the role expects it
+      ansible.builtin.assert:
+        that:
+          - docker_registry_bundled_config_raw.rc == 0
+          - "'storage' in (docker_registry_bundled_config_raw.stdout | from_yaml)"
+        fail_msg: >-
+          docker_registry_container_config_path points at
+          {{ docker_registry_defaults.docker_registry_container_config_path }},
+          which the running container image does not have a readable
+          configuration file at (rc={{ docker_registry_bundled_config_raw.rc }}).
+          The garbage collection command takes this path as an argument.
+        success_msg: >-
+          The container image bundles a registry configuration file at
+          {{ docker_registry_defaults.docker_registry_container_config_path }}
+
+    - name: Make sense of the configuration file bundled inside the Docker Registry container image
+      ansible.builtin.set_fact:
+        docker_registry_bundled_delete_enabled: >-
+          {{
+            (docker_registry_bundled_config_raw.stdout | from_yaml).storage.delete.enabled
+            | default(false) | bool
+          }}
+
     # The env file is read when the container is created, so this is the half
-    # that shows the setting actually took effect in the process: the same
-    # request that the stock image and the first pass both refused with 405 is
-    # now accepted.
+    # that shows the setting actually took effect in the process. Both
+    # directions are exercised: the first installation pass left deletion off
+    # and the second turned it on, with nothing but the env file differing.
     - name: Assert deletion is refused when disabled and accepted when enabled
       ansible.builtin.assert:
         that:
@@ -234,7 +304,9 @@
           enabled: {{ docker_registry_delete_enabled.delete.status }})
         success_msg: >-
           Deletion is refused with 405 while docker_registry_storage_delete_enabled
-          is false and accepted with 202 once it is true
+          is false and accepted with 202 once it is true, while the container
+          image's own configuration file says storage.delete.enabled is
+          {{ docker_registry_bundled_delete_enabled }}
 
     - name: Query the Docker Registry tag list after the deletion
       ansible.builtin.uri:
@@ -286,6 +358,98 @@
           which is docker_registry_version
 
     # ---------------------------------------------------------------------
+    # What the previous major release wrote is still served after the upgrade
+    # ---------------------------------------------------------------------
+
+    # converge.yml installed the role at the last 2.x release first and pushed
+    # an image through it, before installing the role's own version over the
+    # same storage path. Everything below therefore describes an upgraded
+    # registry rather than a fresh one - which is the only situation in which
+    # a major version bump can go wrong for an operator.
+
+    - name: Assert the seeding pass really ran the previous major release
+      ansible.builtin.assert:
+        that:
+          - >-
+            (docker_registry_seed_state.running_version | split(' ') | last)
+            == docker_registry_molecule_seed_version
+          - >-
+            (docker_registry_running_version.stdout | trim | split(' ') | last)
+            != docker_registry_molecule_seed_version
+        fail_msg: >-
+          The storage was not seeded by a different release than the one now
+          running (seeded by {{ docker_registry_seed_state.running_version }},
+          now running {{ docker_registry_running_version.stdout | trim }}), so
+          nothing below is evidence about an upgrade
+        success_msg: >-
+          The storage was written by {{ docker_registry_molecule_seed_version }} and is
+          now being served by
+          {{ docker_registry_running_version.stdout | trim | split(' ') | last }}
+
+    - name: Assert the previous major release's round trip succeeded at the time
+      ansible.builtin.assert:
+        that:
+          - docker_registry_seeded.manifest_get.status == 200
+          - docker_registry_seeded.manifest_get.digest_matches_pushed
+        fail_msg: "The seeding round trip did not succeed: {{ docker_registry_seeded }}"
+        success_msg: >-
+          {{ docker_registry_molecule_seed_version }} accepted and served back
+          {{ docker_registry_molecule_repository }}:{{ docker_registry_molecule_tag_seeded }}
+
+    - name: Query the manifest that the previous major release pushed
+      ansible.builtin.uri:
+        url: >-
+          {{ docker_registry_molecule_registry_url }}/v2/{{ docker_registry_molecule_repository
+          }}/manifests/{{ docker_registry_molecule_tag_seeded }}
+        headers:
+          Accept: application/vnd.docker.distribution.manifest.v2+json
+      register: docker_registry_seeded_manifest
+
+    # Fetched to a file rather than into a variable, so that the bytes can be
+    # re-hashed on the host: a store that hands back the wrong content after an
+    # upgrade is exactly what this is looking for, and a status code would not
+    # notice it.
+    - name: Fetch the layer blob that the previous major release pushed
+      ansible.builtin.uri:
+        url: >-
+          {{ docker_registry_molecule_registry_url }}/v2/{{ docker_registry_molecule_repository
+          }}/blobs/{{ docker_registry_seeded.pushed.layer_digest }}
+        dest: "{{ docker_registry_molecule_seeded_blob_path }}"
+        mode: "0644"
+      register: docker_registry_seeded_blob
+
+    - name: Re-hash the layer blob that the previous major release pushed
+      ansible.builtin.stat:
+        path: "{{ docker_registry_molecule_seeded_blob_path }}"
+        checksum_algorithm: sha256
+      register: docker_registry_seeded_blob_stat
+
+    - name: Assert the upgraded registry still serves what the previous major release wrote
+      ansible.builtin.assert:
+        that:
+          - docker_registry_seeded_manifest.status == 200
+          - >-
+            docker_registry_seeded_manifest.docker_content_digest
+            == docker_registry_seeded.pushed.manifest_digest
+          - docker_registry_seeded_blob.status == 200
+          - >-
+            'sha256:' ~ docker_registry_seeded_blob_stat.stat.checksum
+            == docker_registry_seeded.pushed.layer_digest
+          - docker_registry_seeded_blob_stat.stat.size == docker_registry_seeded.pushed.layer_size
+        fail_msg: >-
+          The upgraded registry did not serve back what
+          {{ docker_registry_molecule_seed_version }} wrote
+          (manifest: {{ docker_registry_seeded_manifest.docker_content_digest | default('none') }}
+          vs {{ docker_registry_seeded.pushed.manifest_digest }}, layer:
+          sha256:{{ docker_registry_seeded_blob_stat.stat.checksum | default('none') }}
+          vs {{ docker_registry_seeded.pushed.layer_digest }})
+        success_msg: >-
+          The image {{ docker_registry_molecule_seed_version }} pushed is still served by
+          {{ docker_registry_running_version.stdout | trim | split(' ') | last }}, with the
+          manifest digest unchanged and the layer re-hashing to
+          {{ docker_registry_seeded.pushed.layer_digest }} - so the upgrade needs no data migration
+
+    # ---------------------------------------------------------------------
     # The container is created the way the role's variables describe
     # ---------------------------------------------------------------------
 
@@ -320,7 +484,63 @@
           {{ docker_registry_data_path }} at /var/lib/registry
 
     # ---------------------------------------------------------------------
-    # Garbage collection is something the kernel will actually execute
+    # Nothing but the registry API is listening on the container network
+    # ---------------------------------------------------------------------
+
+    # Docker Registry v3's bundled configuration file opens an
+    # unauthenticated debug/metrics listener on :5001. The role does not
+    # publish that port to the host, so the only way to tell whether it is
+    # actually closed is to talk to the container's own address on the
+    # container network - which is exactly where a reverse proxy or any other
+    # co-located container would reach it from.
+    - name: Determine the Docker Registry container's address on its network
+      ansible.builtin.set_fact:
+        docker_registry_container_ip: >-
+          {{ docker_registry_container.NetworkSettings.Networks[docker_registry_container_network].IPAddress }}
+
+    - name: Probe the Docker Registry API on the container network
+      ansible.builtin.uri:
+        url: "http://{{ docker_registry_container_ip }}:{{ docker_registry_defaults.docker_registry_container_http_port }}/v2/"
+        timeout: 10
+      register: docker_registry_probe_api
+      failed_when: false
+
+    - name: Probe the Docker Registry debug/metrics port on the container network
+      ansible.builtin.uri:
+        url: "http://{{ docker_registry_container_ip }}:5001/metrics"
+        timeout: 10
+      register: docker_registry_probe_debug
+      failed_when: false
+
+    # The API probe is what keeps the debug probe honest: without it, "nothing
+    # answered on 5001" could equally well mean the probe never reached the
+    # container at all.
+    - name: Assert the debug/metrics listener is closed while the API is reachable
+      ansible.builtin.assert:
+        that:
+          - docker_registry_probe_api.status == 200
+          - docker_registry_probe_debug.status == -1
+        fail_msg: >-
+          The debug/metrics listener on {{ docker_registry_container_ip }}:5001 answered
+          {{ docker_registry_probe_debug.status }} (the API on the same address answered
+          {{ docker_registry_probe_api.status }}), so docker_registry_http_debug_addr did
+          not keep it closed
+        success_msg: >-
+          {{ docker_registry_container_ip }}:5001 refuses connections while the registry API
+          on the same address answers 200, so the debug/metrics listener is closed
+
+    - name: Assert the configured response headers reach the registry's responses
+      ansible.builtin.assert:
+        that: docker_registry_api_root.x_content_type_options == 'nosniff'
+        fail_msg: >-
+          The registry did not send X-Content-Type-Options: nosniff
+          ({{ docker_registry_api_root.x_content_type_options | default('absent') }})
+        success_msg: >-
+          The registry sends X-Content-Type-Options: nosniff, which comes from
+          docker_registry_http_headers rather than from the container image
+
+    # ---------------------------------------------------------------------
+    # Garbage collection is wired the way the role's variables describe
     # ---------------------------------------------------------------------
 
     - name: Stat the Docker Registry garbage collection script
@@ -355,11 +575,16 @@
             docker_registry_gc_script_lines
             | select('search', 'src=' ~ docker_registry_data_path ~ ',dst=/var/lib/registry')
             | list | length > 0
+          - >-
+            docker_registry_gc_script_lines
+            | select('search', docker_registry_defaults.docker_registry_container_config_path)
+            | list | length > 0
         fail_msg: "The garbage collection script is not what it should be: {{ docker_registry_gc_script_lines }}"
         success_msg: >-
           The garbage collection script starts with a shebang and runs
           registry:{{ docker_registry_defaults.docker_registry_version }}
-          against {{ docker_registry_data_path }}
+          against {{ docker_registry_data_path }} with
+          {{ docker_registry_defaults.docker_registry_container_config_path }}
 
     - name: Determine the Docker Registry garbage collection unit paths
       ansible.builtin.command:
@@ -412,11 +637,20 @@
           - "Service: {{ docker_registry_service.status.ActiveState }}"
           - "API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
           - "Running version: {{ docker_registry_running_version.stdout | trim }}"
+          - >-
+            Upgrade: storage seeded by {{ docker_registry_seed_state.running_version }};
+            its layer re-hashes to sha256:{{ docker_registry_seeded_blob_stat.stat.checksum }}
+            under the running release
           - "Round trip: manifest {{ docker_registry_delete_disabled.manifest_get.digest_header }}"
           - "Layer on host: {{ docker_registry_layer_blob_on_disk.stat.size }} bytes under {{ docker_registry_data_path }}"
           - >-
             Deletion: {{ docker_registry_delete_disabled.delete.status }} when disabled,
             {{ docker_registry_delete_enabled.delete.status }} when enabled
-            (stock image: {{ docker_registry_control.delete.status }})
+            (control: {{ docker_registry_control.delete.status }}; the container image's own
+            configuration file says storage.delete.enabled={{ docker_registry_bundled_delete_enabled }})
+          - >-
+            Debug/metrics port: {{ docker_registry_probe_debug.status }} on
+            {{ docker_registry_container_ip }}:5001 while the API answers
+            {{ docker_registry_probe_api.status }} on the same address
           - "Tags now: {{ docker_registry_tag_list_after.json.tags | default([]) | sort }}"
           - "GC script: {{ docker_registry_gc_script_lines[0] }} ({{ docker_registry_gc_script_stat.stat.mode }})"

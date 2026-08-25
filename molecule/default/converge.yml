@@ -36,6 +36,12 @@
         dest: /var/tmp/roundtrip-registry.py
         mode: "0755"
 
+    - name: Ensure the standalone Docker Registry control configuration file is present
+      ansible.builtin.copy:
+        src: control-config.yml
+        dest: "{{ docker_registry_molecule_control_config_path }}"
+        mode: "0644"
+
     # -----------------------------------------------------------------
     # What the host looked like before the role touched it
     # -----------------------------------------------------------------
@@ -73,11 +79,20 @@
 
     # The image on its own is a working registry, so a test that only checks
     # "a registry answers" would pass without the role having done anything.
-    # Running the stock image here, unconfigured, pins down what the image
-    # gives you for free - and therefore what verify.yml may credit the role
-    # with. Deletion is the sharpest of those: the image refuses it by default,
-    # so the 202 the role's second pass gets can only come from the role's env
-    # file.
+    # Running the stock image here, with no role involvement, pins down what
+    # the registry gives you for free - and therefore what verify.yml may
+    # credit the role with.
+    #
+    # The control is deliberately handed an explicit minimal configuration file
+    # (files/control-config.yml) rather than left on the one the container image
+    # bundles. The bundled file is a property of how the image is packaged, not
+    # of the registry, and it is not stable across releases: 2.8.3's said
+    # nothing about `storage.delete` while v3's turns deletion on. A control
+    # resting on it was therefore measuring packaging, and flipped from "the
+    # image refuses deletion" to "the image allows deletion" on the upgrade.
+    # The explicit file says nothing about `storage.delete` either, so what the
+    # control pins down is the registry's own compiled-in default - measured at
+    # 405 on both 2.8.3 and 3.1.1.
     #
     # Started via the Docker CLI rather than community.docker.docker_container,
     # because the ansible-lint environment used by pre-commit does not have the
@@ -100,7 +115,13 @@
           - "{{ docker_registry_molecule_control_container_name }}"
           - -p
           - "127.0.0.1:5099:5000"
+          - -v
+          - "{{ docker_registry_molecule_control_config_path }}:/etc/mash-molecule-control/config.yml:ro"
           - "docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
+          # The image's entrypoint turns a `*.yml` argument into
+          # `registry serve <that file>`, so this is what replaces the bundled
+          # configuration file rather than merely adding to it.
+          - /etc/mash-molecule-control/config.yml
       changed_when: true
 
     - name: Wait for the standalone Docker Registry control container to answer (up to 60s)
@@ -129,6 +150,77 @@
         mode: "0644"
 
     # -----------------------------------------------------------------
+    # Seeding pass: the previous major release, so an upgrade is exercised
+    # -----------------------------------------------------------------
+
+    # A fresh install cannot see the only question an operator with an existing
+    # registry has about a major version bump: whether the new release can
+    # still read what the old one wrote. So the role is installed once at the
+    # last release of the previous major version, an image is pushed through
+    # it, and every pass below then runs over that same storage path.
+    #
+    # Not public, so the overrides stay scoped to this include.
+    - name: Include the Docker Registry role at the previous major release
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
+      vars:
+        docker_registry_version: "{{ docker_registry_molecule_seed_version }}"
+        docker_registry_container_config_path: "{{ docker_registry_molecule_seed_config_path }}"
+
+    - name: Ensure the Docker Registry systemd service is started at the previous major release
+      ansible.builtin.systemd_service:
+        name: docker-registry.service
+        state: started
+        daemon_reload: true
+
+    - name: Wait for the Docker Registry API at the previous major release to answer (up to 300s)
+      ansible.builtin.uri:
+        url: "{{ docker_registry_molecule_registry_url }}/v2/"
+      register: docker_registry_molecule_ping_seed
+      until: docker_registry_molecule_ping_seed is not failed
+      retries: 60
+      delay: 5
+
+    - name: Run a round trip against Docker Registry at the previous major release
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /var/tmp/roundtrip-registry.py
+          - "{{ docker_registry_molecule_registry_url }}"
+          - "{{ docker_registry_molecule_repository }}"
+          - "{{ docker_registry_molecule_tag_seeded }}"
+      register: docker_registry_molecule_roundtrip_seeded
+      changed_when: true
+
+    - name: Record the Docker Registry round trip at the previous major release
+      ansible.builtin.copy:
+        dest: "{{ docker_registry_molecule_report_path_seeded }}"
+        content: "{{ docker_registry_molecule_roundtrip_seeded.stdout }}"
+        mode: "0644"
+
+    - name: Record which Docker Registry release seeded the storage
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - docker-registry
+          - /bin/registry
+          - --version
+      register: docker_registry_molecule_seed_running_version
+      changed_when: false
+
+    - name: Record what the seeding pass ran
+      ansible.builtin.copy:
+        dest: /root/seed-state.json
+        mode: "0644"
+        content: |
+          {{
+            {
+              'running_version': docker_registry_molecule_seed_running_version.stdout | trim,
+            } | to_nice_json
+          }}
+
+    # -----------------------------------------------------------------
     # First pass: the role's own default, which refuses deletion
     # -----------------------------------------------------------------
 
@@ -136,10 +228,12 @@
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
 
-    - name: Ensure the Docker Registry systemd service is started
+    # Restarted rather than started, because the seeding pass left an older
+    # release running and the unit file has just been rewritten.
+    - name: Ensure the Docker Registry systemd service is restarted
       ansible.builtin.systemd_service:
         name: docker-registry.service
-        state: started
+        state: restarted
         daemon_reload: true
 
     - name: Wait for the Docker Registry API to answer (up to 300s)
@@ -182,7 +276,7 @@
 
     # The env file is only read when the container is created, so the running
     # process keeps the old setting until the service is restarted.
-    - name: Ensure the Docker Registry systemd service is restarted
+    - name: Ensure the Docker Registry systemd service is restarted with deletion enabled
       ansible.builtin.systemd_service:
         name: docker-registry.service
         state: restarted

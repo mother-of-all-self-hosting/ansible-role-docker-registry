@@ -35,23 +35,40 @@ provisioner:
         # Where the registry is reachable from inside the Molecule container.
         docker_registry_molecule_registry_url: "http://127.0.0.1:5000"
 
-        # The stock container image, run with no role involvement at all, as a
-        # negative control: it establishes which of the assertions in
-        # verify.yml are the role's doing rather than the image's.
+        # The stock container image, run with no role involvement at all and on
+        # an explicit minimal configuration file, as a negative control: it
+        # establishes which of the assertions in verify.yml are the role's
+        # doing rather than the registry's own defaults.
         docker_registry_molecule_control_container_name: docker-registry-default-standalone-control
         docker_registry_molecule_control_url: "http://127.0.0.1:5099"
         docker_registry_molecule_control_report_path: /root/roundtrip-standalone-control.json
+        docker_registry_molecule_control_config_path: /var/tmp/registry-control-config.yml
+
+        # The release the storage is seeded at before the role's own version is
+        # installed over it, so that the scenario exercises an upgrade rather
+        # than only a fresh install. This is the last 2.x release; update it
+        # when the role crosses another major version boundary.
+        docker_registry_molecule_seed_version: 2.8.3
+        # Where that release keeps the configuration file the role's garbage
+        # collection command points at. It moved in v3.
+        docker_registry_molecule_seed_config_path: /etc/docker/registry/config.yml
 
         # What the round trip pushes. Each pass uses a tag of its own, so that
         # the image the first pass pushed is still there to be looked at after
         # the second pass has deleted its own.
         docker_registry_molecule_repository: mash/molecule-probe
+        docker_registry_molecule_tag_seeded: seeded-by-previous-major
         docker_registry_molecule_tag_delete_disabled: delete-disabled
         docker_registry_molecule_tag_delete_enabled: delete-enabled
 
         # Where converge.yml leaves the round trip reports for verify.yml.
+        docker_registry_molecule_report_path_seeded: /root/roundtrip-seeded.json
         docker_registry_molecule_report_path_delete_disabled: /root/roundtrip-delete-disabled.json
         docker_registry_molecule_report_path_delete_enabled: /root/roundtrip-delete-enabled.json
+
+        # Where verify.yml puts the blob it fetches back out of the upgraded
+        # registry, so that it can be re-hashed on the host.
+        docker_registry_molecule_seeded_blob_path: /root/seeded-layer.blob
 
         # Variables for Docker Registry
         docker_registry_enabled: true  # Because it is disabled by default

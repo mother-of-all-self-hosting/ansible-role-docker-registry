@@ -586,6 +586,64 @@
           against {{ docker_registry_data_path }} with
           {{ docker_registry_defaults.docker_registry_container_config_path }}
 
+    # -----------------------------------------------------------------
+    # Garbage collection does not work, and this scenario says so
+    # -----------------------------------------------------------------
+    #
+    # Under the role's own defaults the rendered script is not valid bash and
+    # so has never run. `on_exit()`'s body consists of the
+    # `docker_registry_garbage_collect_stop_service_enabled` conditional
+    # (false by default) and `docker_registry_garbage_collect_command_post`
+    # (empty by default), which leaves `function on_exit() { }` with a
+    # whitespace-only body - a syntax error, and bash exits 2 without running
+    # any of the script. Before that it was an ENOEXEC (a Jinja comment above
+    # the shebang), fixed in 2026-08. So no MASH installation has ever
+    # collected garbage, even though mash-playbook does enable the timer.
+    #
+    # That is being left alone on purpose rather than repaired. Repairing it
+    # would make the first collection any operator has ever had a *v3*
+    # collection, over however many years of accumulated data, and v3's
+    # collector removes classes of files 2.8.3's never touched (dangling
+    # per-repository `_layers` links, and marking that recurses through
+    # manifest lists). Leaving it broken is what keeps the deletion risk at
+    # zero.
+    #
+    # This assertion therefore pins the broken state rather than the working
+    # one. It is deliberately the opposite of what you would normally write,
+    # and it is here so that the state is recorded in something that runs
+    # rather than only in a comment: whoever repairs `on_exit()` has to delete
+    # this task, at which point they own the decision to let collection start
+    # running.
+    #
+    # Note the scope: this holds *under the role's defaults*. Setting either
+    # `docker_registry_garbage_collect_stop_service_enabled` or
+    # `docker_registry_garbage_collect_command_post` gives `on_exit()` a real
+    # body, and collection then runs on schedule.
+    - name: Check whether the Docker Registry garbage collection script is valid bash
+      ansible.builtin.command:
+        argv:
+          - bash
+          - -n
+          - "{{ docker_registry_bin_path }}/garbage-collect"
+      register: docker_registry_gc_script_syntax
+      changed_when: false
+      failed_when: false
+
+    - name: Assert the Docker Registry garbage collection script is known non-functional
+      ansible.builtin.assert:
+        that:
+          - docker_registry_gc_script_syntax.rc != 0
+          - "'syntax error' in docker_registry_gc_script_syntax.stderr"
+        fail_msg: >-
+          The garbage collection script now passes `bash -n`, so garbage
+          collection would run on schedule. That is a deliberate decision
+          rather than an accident: see the comment above this task, decide
+          whether collection should start running, and if so replace this
+          assertion with one that exercises a collection.
+        success_msg: >-
+          The garbage collection script is not valid bash under the role's
+          defaults and so never runs, which is the known and deliberate state
+
     - name: Determine the Docker Registry garbage collection unit paths
       ansible.builtin.command:
         argv:
@@ -653,4 +711,7 @@
             {{ docker_registry_container_ip }}:5001 while the API answers
             {{ docker_registry_probe_api.status }} on the same address
           - "Tags now: {{ docker_registry_tag_list_after.json.tags | default([]) | sort }}"
-          - "GC script: {{ docker_registry_gc_script_lines[0] }} ({{ docker_registry_gc_script_stat.stat.mode }})"
+          - >-
+            GC script: {{ docker_registry_gc_script_lines[0] }}
+            ({{ docker_registry_gc_script_stat.stat.mode }}), `bash -n` exits
+            {{ docker_registry_gc_script_syntax.rc }} - known non-functional on purpose

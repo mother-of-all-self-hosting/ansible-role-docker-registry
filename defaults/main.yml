@@ -164,8 +164,45 @@ docker_registry_private_services_whitelisted_ip_ranges: []
 
 # docker_registry_storage_delete_enabled enables the deletion of image blobs and manifests by digest.
 # Controls `REGISTRY_STORAGE_DELETE_ENABLED`
-# See: https://docs.docker.com/registry/configuration/#delete
+# See: https://distribution.github.io/distribution/about/configuration/#delete
+#
+# Note that the v3 container image's own bundled configuration file turns deletion *on*
+# (the 2.8.3 one said nothing about it, leaving the registry's own `false` default in place).
+# This variable is passed as an environment variable, and environment variables outrank the
+# configuration file, so a `false` here still results in the registry refusing deletion with
+# `405 UNSUPPORTED` - but do not remove it expecting the image to be safe by itself.
 docker_registry_storage_delete_enabled: false
+
+# docker_registry_log_level controls how verbosely the registry logs.
+# Controls `REGISTRY_LOG_LEVEL`. One of: error, warn, info, debug.
+#
+# The v3 container image's bundled configuration file sets this to `debug`, while the 2.8.3
+# one left the registry's own `info` default alone. The container's output ends up in the
+# systemd journal, so `debug` means a log line per request plus internals, permanently.
+# Set to an empty value to leave whatever the container image's configuration file says alone.
+docker_registry_log_level: info
+
+# docker_registry_http_debug_addr controls the address of the debug/metrics HTTP listener.
+# Controls `REGISTRY_HTTP_DEBUG_ADDR`. An empty value (the default) keeps it closed.
+#
+# The v3 container image's bundled configuration file opens an unauthenticated listener on
+# `:5001` serving Prometheus metrics and Go pprof endpoints; the 2.8.3 one did not. This role
+# does not publish that port to the host, but every other container on
+# `docker_registry_container_network` and on `docker_registry_container_additional_networks`
+# (which typically includes the reverse proxy's network) can reach it.
+#
+# Set to e.g. `:5001` to opt back in, and note that doing so exposes it to those networks.
+docker_registry_http_debug_addr: ""
+
+# docker_registry_http_headers contains response headers added to every registry response.
+# Controls `REGISTRY_HTTP_HEADERS` (rendered as JSON). Values are lists, as the registry
+# expects. Set to an empty value to leave the container image's own headers alone.
+#
+# The 2.8.3 container image's bundled configuration file set `X-Content-Type-Options: nosniff`;
+# the v3 one does not. Keeping it here keeps the header on regardless of the image.
+docker_registry_http_headers:
+  X-Content-Type-Options:
+    - nosniff
 
 # docker_registry_garbage_collect_schedule contains a systemd OnCalendar definition which controls how often `registry-gargage-collect.timer` runs
 docker_registry_garbage_collect_schedule: 'Sunday *-*-* 08:30:00'

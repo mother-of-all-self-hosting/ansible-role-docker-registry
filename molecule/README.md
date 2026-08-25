@@ -49,11 +49,17 @@ Currently these testing scenarios are available:
 
 Tests a standard Docker Registry installation.
 
-Before the role runs, the scenario records that the host has no registry, and starts the stock container image unconfigured as a negative control, so that what the image provides on its own is not credited to the role.
+Before the role runs, the scenario records that the host has no registry, and starts the stock container image as a negative control, so that what a registry provides on its own is not credited to the role. The control is handed [an explicit minimal configuration file](default/files/control-config.yml) rather than left on the one the container image bundles: the bundled file describes how the image is packaged rather than how the registry behaves, and it is not stable across releases. It says nothing about `storage.delete`, so what the control pins down is the registry's own compiled-in default — measured at `405` on both 2.8.3 and 3.1.1.
 
-It then checks that the systemd service is active, that `/v2/` identifies itself as a registry, and that a container image can be pushed and read back with every digest matching — over the registry HTTP API rather than with `docker push`, so that the result does not depend on the Docker version the test runs against. The pushed blob is then located on the host, under the role's bind-mounted data path.
+The role is then installed **at the last 2.x release first**, and an image is pushed through it, before the role's own version is installed over the same storage path. What 2.8.3 wrote is fetched back out of the upgraded registry and re-hashed on the host, so that "a v3 registry still serves a v2 store" is measured rather than assumed. A fresh install cannot see the only question a major version bump raises for someone who already runs a registry.
 
-The role is installed twice, with `docker_registry_storage_delete_enabled` off and then on, to show that the setting reaches the running process: the same deletion is refused with `405` and then accepted with `202`. Finally the running version is compared against `docker_registry_version`, and the garbage collection script and its timer are checked.
+It also checks that the systemd service is active, that `/v2/` identifies itself as a registry, and that a container image can be pushed and read back with every digest matching — over the registry HTTP API rather than with `docker push`, so that the result does not depend on the Docker version the test runs against. The pushed blob is then located on the host, under the role's bind-mounted data path.
+
+The role is installed twice more, with `docker_registry_storage_delete_enabled` off and then on, to show that the setting reaches the running process: the same deletion is refused with `405` and then accepted with `202`. Since the v3 container image's own configuration file turns deletion *on*, that `405` is evidence that the role's env file overrides the file inside the image — which the scenario states explicitly, by reading the bundled configuration file out of the running container. That read doubles as the test for `docker_registry_container_config_path`.
+
+What the v3 image's configuration file would otherwise have changed is checked too: the debug/metrics port is refused on the container's own address while the API answers on that same address (which is what keeps the refusal from being a broken probe), and `X-Content-Type-Options: nosniff` is still sent.
+
+Finally the running version is compared against `docker_registry_version`, and the garbage collection script and its timer are checked — including an assertion that the script is *not* valid bash. See [Garbage collection](../README.md#garbage-collection) for why that is deliberate.
 
 ### `default-selfbuild`
 

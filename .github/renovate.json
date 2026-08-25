@@ -1,5 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Patch-level bumps of docker_registry_version automerge, on this evidence:",
+    "The registry has no database and no schema. Its storage is a content-addressed directory tree, and nothing runs at startup that rewrites it. The on-disk layout is defined by registry/storage/paths.go, which is unchanged in substance across every patch span checked (v2.8.1 -> v2.8.2, v2.8.2 -> v2.8.3, v3.1.0 -> v3.1.1); the only edit any of them made to that file was a gofmt doc-comment reflow.",
+    "The Molecule default scenario runs the bumped version and asserts that `/bin/registry --version` equals docker_registry_version, so a bump the image does not actually carry fails CI. It does so over storage that an older release wrote and pushed an image into, which makes a bump an upgrade test rather than a fresh install.",
+    "Nothing deletes data unattended: docker_registry_storage_delete_enabled is false by default, and garbage collection does not run (see the README). Rolling a patch back is a plain version pin, verified to work even over storage that the newer release had written to.",
+    "Minor and major bumps are not automerged. The v2 -> v3 bump needed adaptation in this role - the configuration file moved inside the container image, and the image's bundled configuration changed four defaults - which is exactly the kind of thing a human should look at."
+  ],
   "extends": [
     "github>mother-of-all-self-hosting/renovate-config#v1.0.0",
     "github>mother-of-all-self-hosting/renovate-config//patch-automerge#v1.0.0"

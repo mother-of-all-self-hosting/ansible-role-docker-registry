@@ -19,7 +19,18 @@ docker_registry_data_path: "{{ docker_registry_base_path }}/data"
 docker_registry_bin_path: "{{ docker_registry_base_path }}/bin"
 
 # renovate: datasource=docker depName=registry versioning=semver
-docker_registry_version: 2.8.3
+docker_registry_version: 3.1.1
+
+# Path of the configuration file which the container image bundles.
+#
+# The registry service itself does not need this value - the container image's own `CMD`
+# already points at it - but `registry garbage-collect` takes the configuration file as a
+# positional argument, so `../templates/bin/garbage-collect.j2` has to spell the path out.
+#
+# Docker Registry v3's container image moved this file from `/etc/docker/registry/config.yml`
+# to `/etc/distribution/config.yml`. If you pin `docker_registry_version` back to a 2.x
+# release, set this back to `/etc/docker/registry/config.yml` as well.
+docker_registry_container_config_path: /etc/distribution/config.yml
 
 docker_registry_uid: ""
 docker_registry_gid: ""

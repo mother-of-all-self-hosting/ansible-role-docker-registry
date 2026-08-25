@@ -48,5 +48,5 @@ $docker_run_flags \
 --env-file={{ docker_registry_base_path }}/env \
 {{ docker_registry_container_image }} \
 /bin/registry garbage-collect \
-/etc/docker/registry/config.yml \
+{{ docker_registry_container_config_path }} \
 --dry-run={{ docker_registry_garbage_collect_dry_run | to_json }}

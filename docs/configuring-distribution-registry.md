@@ -56,7 +56,6 @@ docker_registry_hostname: "example.com"
 
 After adjusting the hostname, make sure to adjust your DNS records to point the domain to your server.
 
-
 ### Whitelisting IPs
 
 Only whitelisted IPs will be able to perform DELETE, PATCH, POST, PUT requests against the registry. All other IP addresses get read-only (GET, HEAD) access.

@@ -4,7 +4,7 @@ galaxy_info:
   company: mash
   role_name: docker_registry
   namespace: mash
-  description: Docker Registry
+  description: Distribution Registry
   platforms:
     - name: Debian
       versions:

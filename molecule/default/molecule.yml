@@ -70,7 +70,7 @@ provisioner:
         # registry, so that it can be re-hashed on the host.
         docker_registry_molecule_seeded_blob_path: /root/seeded-layer.blob
 
-        # Variables for Docker Registry
+        # Variables for Distribution Registry
         docker_registry_enabled: true  # Because it is disabled by default
         docker_registry_identifier: docker-registry  # The default value is `container-registry`
         docker_registry_uid: 1000

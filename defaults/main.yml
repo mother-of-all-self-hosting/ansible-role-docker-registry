@@ -27,7 +27,7 @@ docker_registry_version: 3.1.1
 # already points at it - but `registry garbage-collect` takes the configuration file as a
 # positional argument, so `../templates/bin/garbage-collect.j2` has to spell the path out.
 #
-# Docker Registry v3's container image moved this file from `/etc/docker/registry/config.yml`
+# Distribution Registry v3's container image moved this file from `/etc/docker/registry/config.yml`
 # to `/etc/distribution/config.yml`. If you pin `docker_registry_version` back to a 2.x
 # release, set this back to `/etc/docker/registry/config.yml` as well.
 docker_registry_container_config_path: /etc/distribution/config.yml

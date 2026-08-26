@@ -7,12 +7,12 @@
 ---
 # Everything that needs the supporting roles' variables in scope lives in this
 # one play, because `public: true` exposes them to the rest of the play only.
-- name: Install and exercise Docker Registry for Molecule tests
+- name: Install and exercise Distribution Registry for Molecule tests
   hosts: all
   become: true
   gather_facts: true
   tasks:
-    - name: Include supporting roles for Docker Registry Molecule tests
+    - name: Include supporting roles for Distribution Registry Molecule tests
       ansible.builtin.include_role:
         name: "{{ role_name }}"
         public: true
@@ -25,18 +25,18 @@
     # Role defaults are not in scope here, but the version Renovate bumps lives
     # in them, and the negative control below has to run the very same image
     # the role is about to run.
-    - name: Load the Docker Registry role defaults
+    - name: Load the Distribution Registry role defaults
       ansible.builtin.include_vars:
         file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
         name: docker_registry_defaults
 
-    - name: Ensure the Docker Registry round trip script is present
+    - name: Ensure the Distribution Registry round trip script is present
       ansible.builtin.copy:
         src: roundtrip-registry.py
         dest: /var/tmp/roundtrip-registry.py
         mode: "0755"
 
-    - name: Ensure the standalone Docker Registry control configuration file is present
+    - name: Ensure the standalone Distribution Registry control configuration file is present
       ansible.builtin.copy:
         src: control-config.yml
         dest: "{{ docker_registry_molecule_control_config_path }}"
@@ -50,12 +50,12 @@
     # verify.yml. Without this, an assertion that the role's port answers and
     # its data path holds blobs could just as well be describing something that
     # was already there.
-    - name: Stat the Docker Registry data path before the role runs
+    - name: Stat the Distribution Registry data path before the role runs
       ansible.builtin.stat:
         path: "{{ docker_registry_data_path }}"
       register: docker_registry_molecule_data_path_before
 
-    - name: Determine whether anything answers on the Docker Registry port before the role runs
+    - name: Determine whether anything answers on the Distribution Registry port before the role runs
       ansible.builtin.uri:
         url: "{{ docker_registry_molecule_registry_url }}/v2/"
       register: docker_registry_molecule_port_before
@@ -97,7 +97,7 @@
     # Started via the Docker CLI rather than community.docker.docker_container,
     # because the ansible-lint environment used by pre-commit does not have the
     # community.docker collection and would fail the playbook syntax check.
-    - name: Ensure the stock Docker Registry container image is pulled
+    - name: Ensure the stock Distribution Registry container image is pulled
       ansible.builtin.command:
         argv:
           - docker
@@ -105,7 +105,7 @@
           - "docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
       changed_when: true
 
-    - name: Ensure the standalone Docker Registry control container is running
+    - name: Ensure the standalone Distribution Registry control container is running
       ansible.builtin.command:
         argv:
           - docker
@@ -124,7 +124,7 @@
           - /etc/mash-molecule-control/config.yml
       changed_when: true
 
-    - name: Wait for the standalone Docker Registry control container to answer (up to 60s)
+    - name: Wait for the standalone Distribution Registry control container to answer (up to 60s)
       ansible.builtin.uri:
         url: "{{ docker_registry_molecule_control_url }}/v2/"
       register: docker_registry_molecule_control_ping
@@ -132,7 +132,7 @@
       retries: 12
       delay: 5
 
-    - name: Run a round trip against the standalone Docker Registry control container
+    - name: Run a round trip against the standalone Distribution Registry control container
       ansible.builtin.command:
         argv:
           - python3
@@ -143,7 +143,7 @@
       register: docker_registry_molecule_control_roundtrip
       changed_when: true
 
-    - name: Record the standalone Docker Registry control round trip
+    - name: Record the standalone Distribution Registry control round trip
       ansible.builtin.copy:
         dest: "{{ docker_registry_molecule_control_report_path }}"
         content: "{{ docker_registry_molecule_control_roundtrip.stdout }}"
@@ -160,20 +160,20 @@
     # it, and every pass below then runs over that same storage path.
     #
     # Not public, so the overrides stay scoped to this include.
-    - name: Include the Docker Registry role at the previous major release
+    - name: Include the Distribution Registry role at the previous major release
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
       vars:
         docker_registry_version: "{{ docker_registry_molecule_seed_version }}"
         docker_registry_container_config_path: "{{ docker_registry_molecule_seed_config_path }}"
 
-    - name: Ensure the Docker Registry systemd service is started at the previous major release
+    - name: Ensure the Distribution Registry systemd service is started at the previous major release
       ansible.builtin.systemd_service:
         name: docker-registry.service
         state: started
         daemon_reload: true
 
-    - name: Wait for the Docker Registry API at the previous major release to answer (up to 300s)
+    - name: Wait for the Distribution Registry API at the previous major release to answer (up to 300s)
       ansible.builtin.uri:
         url: "{{ docker_registry_molecule_registry_url }}/v2/"
       register: docker_registry_molecule_ping_seed
@@ -181,7 +181,7 @@
       retries: 60
       delay: 5
 
-    - name: Run a round trip against Docker Registry at the previous major release
+    - name: Run a round trip against Distribution Registry at the previous major release
       ansible.builtin.command:
         argv:
           - python3
@@ -192,13 +192,13 @@
       register: docker_registry_molecule_roundtrip_seeded
       changed_when: true
 
-    - name: Record the Docker Registry round trip at the previous major release
+    - name: Record the Distribution Registry round trip at the previous major release
       ansible.builtin.copy:
         dest: "{{ docker_registry_molecule_report_path_seeded }}"
         content: "{{ docker_registry_molecule_roundtrip_seeded.stdout }}"
         mode: "0644"
 
-    - name: Record which Docker Registry release seeded the storage
+    - name: Record which Distribution Registry release seeded the storage
       ansible.builtin.command:
         argv:
           - docker
@@ -224,19 +224,19 @@
     # First pass: the role's own default, which refuses deletion
     # -----------------------------------------------------------------
 
-    - name: Include the Docker Registry role
+    - name: Include the Distribution Registry role
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
 
     # Restarted rather than started, because the seeding pass left an older
     # release running and the unit file has just been rewritten.
-    - name: Ensure the Docker Registry systemd service is restarted
+    - name: Ensure the Distribution Registry systemd service is restarted
       ansible.builtin.systemd_service:
         name: docker-registry.service
         state: restarted
         daemon_reload: true
 
-    - name: Wait for the Docker Registry API to answer (up to 300s)
+    - name: Wait for the Distribution Registry API to answer (up to 300s)
       ansible.builtin.uri:
         url: "{{ docker_registry_molecule_registry_url }}/v2/"
       register: docker_registry_molecule_ping
@@ -244,7 +244,7 @@
       retries: 60
       delay: 5
 
-    - name: Run a round trip against Docker Registry with deletion disabled
+    - name: Run a round trip against Distribution Registry with deletion disabled
       ansible.builtin.command:
         argv:
           - python3
@@ -255,7 +255,7 @@
       register: docker_registry_molecule_roundtrip_delete_disabled
       changed_when: true
 
-    - name: Record the Docker Registry round trip with deletion disabled
+    - name: Record the Distribution Registry round trip with deletion disabled
       ansible.builtin.copy:
         dest: "{{ docker_registry_molecule_report_path_delete_disabled }}"
         content: "{{ docker_registry_molecule_roundtrip_delete_disabled.stdout }}"
@@ -268,7 +268,7 @@
     # Not public, so the override stays scoped to this include. Only the env
     # file changes, which makes this a test of the role's env file rather than
     # of anything Molecule does directly.
-    - name: Include the Docker Registry role with deletion enabled
+    - name: Include the Distribution Registry role with deletion enabled
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
       vars:
@@ -276,13 +276,13 @@
 
     # The env file is only read when the container is created, so the running
     # process keeps the old setting until the service is restarted.
-    - name: Ensure the Docker Registry systemd service is restarted with deletion enabled
+    - name: Ensure the Distribution Registry systemd service is restarted with deletion enabled
       ansible.builtin.systemd_service:
         name: docker-registry.service
         state: restarted
         daemon_reload: true
 
-    - name: Wait for the Docker Registry API to answer again (up to 300s)
+    - name: Wait for the Distribution Registry API to answer again (up to 300s)
       ansible.builtin.uri:
         url: "{{ docker_registry_molecule_registry_url }}/v2/"
       register: docker_registry_molecule_ping_again
@@ -290,7 +290,7 @@
       retries: 60
       delay: 5
 
-    - name: Run a round trip against Docker Registry with deletion enabled
+    - name: Run a round trip against Distribution Registry with deletion enabled
       ansible.builtin.command:
         argv:
           - python3
@@ -301,7 +301,7 @@
       register: docker_registry_molecule_roundtrip_delete_enabled
       changed_when: true
 
-    - name: Record the Docker Registry round trip with deletion enabled
+    - name: Record the Distribution Registry round trip with deletion enabled
       ansible.builtin.copy:
         dest: "{{ docker_registry_molecule_report_path_delete_enabled }}"
         content: "{{ docker_registry_molecule_roundtrip_delete_enabled.stdout }}"

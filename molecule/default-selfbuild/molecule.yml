@@ -35,7 +35,7 @@ provisioner:
         # Where the registry is reachable from inside the Molecule container.
         docker_registry_molecule_registry_url: "http://127.0.0.1:5000"
 
-        # Variables for Docker Registry
+        # Variables for Distribution Registry
         docker_registry_enabled: true  # Because it is disabled by default
         docker_registry_identifier: docker-registry  # The default value is `container-registry`
         docker_registry_uid: 1000

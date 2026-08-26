@@ -47,7 +47,7 @@ Currently these testing scenarios are available:
 
 ### `default`
 
-Tests a standard Docker Registry installation.
+Tests a standard Distribution Registry installation.
 
 Before the role runs, the scenario records that the host has no registry, and starts the stock container image as a negative control, so that what a registry provides on its own is not credited to the role. The control is handed [an explicit minimal configuration file](default/files/control-config.yml) rather than left on the one the container image bundles: the bundled file describes how the image is packaged rather than how the registry behaves, and it is not stable across releases. It says nothing about `storage.delete`, so what the control pins down is the registry's own compiled-in default — measured at `405` on both 2.8.3 and 3.1.1.
 
@@ -63,7 +63,7 @@ Finally the running version is compared against `docker_registry_version`, and t
 
 ### `default-selfbuild`
 
-Tests a standard Docker Registry installation with self-building the container image.
+Tests a standard Distribution Registry installation with self-building the container image.
 
 Since the `default` scenario covers the registry's behavior, this one checks what is peculiar to self-building: that the service runs the locally built image, and that this image carries no repository digest — which an image pulled from a registry always does, and one built here never can.
 

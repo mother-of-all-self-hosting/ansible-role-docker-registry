@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-- name: Perform Docker Registry installation tasks
+- name: Perform Distribution Registry installation tasks
   when: docker_registry_enabled | bool
   tags:
     - setup-all
@@ -11,16 +11,16 @@
     - install-all
     - install-docker-registry
   block:
-    - name: Validate Docker Registry configuration
+    - name: Validate Distribution Registry configuration
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
-    - name: Install Docker Registry
+    - name: Install Distribution Registry
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
 
-- name: Perform Docker Registry uninstallation tasks
+- name: Perform Distribution Registry uninstallation tasks
   when: not docker_registry_enabled | bool
   tags:
     - setup-all
     - setup-docker-registry
   block:
-    - name: Uninstall Docker Registry
+    - name: Uninstall Distribution Registry
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/uninstall.yml"

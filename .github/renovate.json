@@ -8,7 +8,7 @@
     "Minor and major bumps are not automerged. The v2 -> v3 bump needed adaptation in this role - the configuration file moved inside the container image, and the image's bundled configuration changed four defaults - which is exactly the kind of thing a human should look at."
   ],
   "extends": [
-    "github>mother-of-all-self-hosting/renovate-config#v1.0.0",
-    "github>mother-of-all-self-hosting/renovate-config//patch-automerge#v1.0.0"
+    "github>mother-of-all-self-hosting/renovate-config#v1.1.0",
+    "github>mother-of-all-self-hosting/renovate-config//patch-automerge#v1.1.0"
   ]
 }

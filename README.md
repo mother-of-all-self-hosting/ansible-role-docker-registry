@@ -5,9 +5,9 @@ SPDX-FileCopyrightText: 2026 Suguru Hirahara
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Docker Registry Ansible role
+# Distribution Registry Ansible role
 
-This is an [Ansible](https://www.ansible.com/) role which installs the [Docker Registry](https://docs.docker.com/registry/) container image distribution registry to run as a [Docker](https://www.docker.com/) container wrapped in a systemd service.
+This is an [Ansible](https://www.ansible.com/) role which installs [Distribution Registry](https://github.com/distribution/distribution/) to run as a [Docker](https://www.docker.com/) container wrapped in a systemd service.
 
 This role *implicitly* depends on:
 

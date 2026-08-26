@@ -126,22 +126,23 @@ docker rmi registry.example.com/alpine:3.17.2
 docker pull registry.example.com/alpine:3.17.2
 ```
 
-### Upgrading from Docker Registry v2 to v3
+### Upgrading from Docker Registry v2 to Distribution Registry v3
 
-This role used to install Docker Registry 2.8.3 and now installs 3.x. **No data migration is involved**, and there is nothing for you to do beyond re-running the playbook.
+This role used to install Docker Registry 2.8.3 and now installs Distribution Registry v3.
 
-- **The on-disk layout is unchanged.** v3 reads a store written by 2.8.3 as-is. There is no upstream migration guide because upstream does not consider one necessary ([distribution/distribution#4615](https://github.com/distribution/distribution/discussions/4615)).
-- **Rolling back works.** 2.8.3 was verified to serve a store that v3 had written to, including images that had only ever been pushed under v3, with digests intact. If v3 gives you trouble, pinning `docker_registry_version` back to `2.8.3` is a safe retreat. Set `docker_registry_container_config_path` back to `/etc/docker/registry/config.yml` as well, since that file moved inside the container image.
-- The Molecule `default` scenario performs the upgrade on every CI run: it installs the role at 2.8.3, pushes an image, installs the current version over the same storage path, and then re-fetches and re-hashes what 2.8.3 wrote.
+>[!NOTE]
+> The original Docker Registry project has been deprecated, and donated to Cloud Native Computing Foundation (CNCF) in 2019. See [this announcement](https://docs.docker.com/retired/#registry-now-cncf-distribution) for details.
+
+**No data migration is involved.** The on-disk layout is unchanged, and there is no upstream migration guide because upstream does not consider one necessary (see: [distribution/distribution#4615](https://github.com/distribution/distribution/discussions/4615)). There is nothing for you to do beyond re-running the playbook.
 
 Things to be aware of:
 
 - **The `oss` and `swift` storage drivers are gone in v3.** Only relevant if you selected one through `docker_registry_environment_variables_additional_variables`; a plain filesystem-backed registry (what this role sets up) is unaffected.
-- **Some configuration keys were renamed or removed in v3**, again only relevant if you set them yourself: the `compatibility.*` and `reporting.*` sections are gone, and the whole `redis.*` section was reshaped (`redis.addr` became the list `redis.addrs`, and `redis.pool.*` became `maxidleconns`/`poolsize`/`connmaxidletime`). The `REGISTRY_*` environment variable override mechanism itself is unchanged.
+- **Some configuration keys were renamed or removed in v3.** Again only relevant if you set them yourself: the `compatibility.*` and `reporting.*` sections are gone, and the whole `redis.*` section was reshaped (`redis.addr` became the list `redis.addrs`, and `redis.pool.*` became `maxidleconns`/`poolsize`/`connmaxidletime`). The `REGISTRY_*` environment variable override mechanism itself is unchanged.
 - **Schema 1 manifests are rejected outright by v3**, with an HTTP 500. This can only affect you if `docker_registry_data_path` points at a directory inherited from a registry older than 2.8 — this role has only ever installed 2.8.1 or newer, and 2.8.3 already refuses to accept schema 1 pushes.
 - **The container image's bundled configuration file changed** in ways this role now compensates for: it turns image deletion on, opens an unauthenticated debug/metrics listener on `:5001`, logs at `debug` level, and no longer sends `X-Content-Type-Options: nosniff`. The role's defaults keep all four at what 2.8.3 effectively did. See `docker_registry_storage_delete_enabled`, `docker_registry_http_debug_addr`, `docker_registry_log_level` and `docker_registry_http_headers` in [`defaults/main.yml`](defaults/main.yml).
 
-## Garbage collection
+### Garbage collection
 
 **Garbage collection does not work and has never worked.** This role installs `bin/garbage-collect` plus a systemd service and timer for it, and the playbook enables the timer, but under the role's default settings the generated script is not valid bash: `on_exit()` ends up with an empty body, and `bash` exits with a syntax error without running any of it. Before that, the script had a different defect (a blank first line, which the kernel rejects with `ENOEXEC`), so no collection has ever run on any installation.
 

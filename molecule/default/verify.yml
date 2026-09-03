@@ -346,16 +346,9 @@
 
     - name: Assert the running Distribution Registry is the version this role installs
       ansible.builtin.assert:
-        that: >-
-          (docker_registry_running_version.stdout | trim | split(' ') | last)
-          == docker_registry_defaults.docker_registry_version
-        fail_msg: >-
-          The running registry is not {{ docker_registry_defaults.docker_registry_version }}:
-          {{ docker_registry_running_version.stdout }}
-        success_msg: >-
-          The running registry reports
-          {{ docker_registry_running_version.stdout | trim | split(' ') | last }},
-          which is docker_registry_version
+        that: "(docker_registry_running_version.stdout | trim | split(' ') | last) == docker_registry_defaults.docker_registry_version"
+        fail_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last | default('none') }}, expected {{ docker_registry_defaults.docker_registry_version }}"
+        success_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last }}"
 
     # ---------------------------------------------------------------------
     # What the previous major release wrote is still served after the upgrade

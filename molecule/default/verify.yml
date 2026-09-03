@@ -685,26 +685,26 @@
     - name: Show the Distribution Registry verification summary
       ansible.builtin.debug:
         msg:
-          - "Service: {{ docker_registry_service.status.ActiveState }}"
-          - "API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
-          - "Running version: {{ docker_registry_running_version.stdout | trim }}"
+          - "Distribution Registry systemd: {{ docker_registry_service.status.ActiveState }}"
+          - "Distribution Registry version: {{ docker_registry_running_version.stdout | trim }}"
+          - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
           - >-
-            Upgrade: storage seeded by {{ docker_registry_seed_state.running_version }};
+            Distribution Registry upgrade: storage seeded by {{ docker_registry_seed_state.running_version }};
             its layer re-hashes to sha256:{{ docker_registry_seeded_blob_stat.stat.checksum }}
             under the running release
-          - "Round trip: manifest {{ docker_registry_delete_disabled.manifest_get.digest_header }}"
-          - "Layer on host: {{ docker_registry_layer_blob_on_disk.stat.size }} bytes under {{ docker_registry_data_path }}"
+          - "Distribution Registry round trip: manifest {{ docker_registry_delete_disabled.manifest_get.digest_header }}"
+          - "Distribution Registry layer on host: {{ docker_registry_layer_blob_on_disk.stat.size }} bytes under {{ docker_registry_data_path }}"
           - >-
-            Deletion: {{ docker_registry_delete_disabled.delete.status }} when disabled,
+            Distribution Registry deletion: {{ docker_registry_delete_disabled.delete.status }} when disabled,
             {{ docker_registry_delete_enabled.delete.status }} when enabled
             (control: {{ docker_registry_control.delete.status }}; the container image's own
             configuration file says storage.delete.enabled={{ docker_registry_bundled_delete_enabled }})
           - >-
-            Debug/metrics port: {{ docker_registry_probe_debug.status }} on
+            Distribution Registry debug/metrics port: {{ docker_registry_probe_debug.status }} on
             {{ docker_registry_container_ip }}:5001 while the API answers
             {{ docker_registry_probe_api.status }} on the same address
-          - "Tags now: {{ docker_registry_tag_list_after.json.tags | default([]) | sort }}"
+          - "Distribution Registry tags now: {{ docker_registry_tag_list_after.json.tags | default([]) | sort }}"
           - >-
-            GC script: {{ docker_registry_gc_script_lines[0] }}
+            Distribution Registry GC script: {{ docker_registry_gc_script_lines[0] }}
             ({{ docker_registry_gc_script_stat.stat.mode }}), `bash -n` exits
             {{ docker_registry_gc_script_syntax.rc }} - known non-functional on purpose

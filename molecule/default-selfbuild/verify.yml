@@ -117,7 +117,7 @@
     - name: Show the Distribution Registry self-build verification summary
       ansible.builtin.debug:
         msg:
-          - "Service: {{ docker_registry_service.status.ActiveState }}"
-          - "API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
-          - "Image: {{ docker_registry_container.Config.Image }}"
-          - "Repository digests: {{ docker_registry_image.RepoDigests }}"
+          - "Distribution Registry systemd: {{ docker_registry_service.status.ActiveState }}"
+          - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
+          - "Distribution Registry image: {{ docker_registry_container.Config.Image }}"
+          - "Distribution Registry repository digests: {{ docker_registry_image.RepoDigests }}"

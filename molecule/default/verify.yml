@@ -344,7 +344,7 @@
       register: docker_registry_running_version
       changed_when: false
 
-    - name: Assert the running Distribution Registry is the version the role asks for
+    - name: Assert the running Distribution Registry is the version this role installs
       ansible.builtin.assert:
         that: >-
           (docker_registry_running_version.stdout | trim | split(' ') | last)

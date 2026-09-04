@@ -10,7 +10,7 @@
 # came from, so that is what is checked here: the image was built from the
 # distribution source tree on this host, and the service is running that image
 # rather than the one Docker Hub would have handed over.
-- name: Verify Distribution Registry running a self-built container image
+- name: Verify self-built Distribution Registry
   hosts: all
   become: true
   gather_facts: false

@@ -101,12 +101,12 @@
           - docker
           - inspect
           - "distribution/distribution:v{{ docker_registry_defaults.docker_registry_version }}"
-      register: docker_registry_image_inspect
+      register: docker_registry_image_raw
       changed_when: false
 
     - name: Parse the self-built Distribution Registry container image inspection
       ansible.builtin.set_fact:
-        docker_registry_image: "{{ (docker_registry_image_inspect.stdout | from_json)[0] }}"
+        docker_registry_image: "{{ (docker_registry_image_raw.stdout | from_json)[0] }}"
 
     # An image pulled from a registry carries the repository digest it was
     # pulled by. One that was built here has never been in a registry, so it

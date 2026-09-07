@@ -453,12 +453,12 @@
           - docker
           - inspect
           - docker-registry
-      register: docker_registry_container_inspect
+      register: docker_registry_container_raw
       changed_when: false
 
     - name: Parse the Distribution Registry container inspection
       ansible.builtin.set_fact:
-        docker_registry_container: "{{ (docker_registry_container_inspect.stdout | from_json)[0] }}"
+        docker_registry_container: "{{ (docker_registry_container_raw.stdout | from_json)[0] }}"
 
     - name: Assert the Distribution Registry container is created as configured
       ansible.builtin.assert:

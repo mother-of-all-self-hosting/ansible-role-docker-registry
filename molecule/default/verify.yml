@@ -136,6 +136,32 @@
           {{ docker_registry_api_root.docker_distribution_api_version }}
 
     # ---------------------------------------------------------------------
+    # The version that is running is the one the role asks for
+    # ---------------------------------------------------------------------
+
+    # The registry exposes no version endpoint, and its container image carries
+    # no labels at all (checked against registry:2.8.3 and registry:3.0.0), so
+    # neither the API nor `docker inspect` can answer this. The binary itself
+    # can, and reports the real release rather than a placeholder:
+    # `/bin/registry github.com/docker/distribution 2.8.3`.
+    - name: Query the version of the running Distribution Registry
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - docker-registry
+          - /bin/registry
+          - --version
+      register: docker_registry_running_version
+      changed_when: false
+
+    - name: Assert the running Distribution Registry is the version this role installs
+      ansible.builtin.assert:
+        that: "(docker_registry_running_version.stdout | trim | split(' ') | last) == docker_registry_defaults.docker_registry_version"
+        fail_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last | default('none') }}, expected {{ docker_registry_defaults.docker_registry_version }}"
+        success_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last }}"
+
+    # ---------------------------------------------------------------------
     # A push/pull round trip, verified by digest
     # ---------------------------------------------------------------------
 
@@ -324,32 +350,6 @@
         success_msg: >-
           The deleted tag is gone and
           {{ docker_registry_molecule_tag_delete_disabled }} is untouched
-
-    # ---------------------------------------------------------------------
-    # The version that is running is the one the role asks for
-    # ---------------------------------------------------------------------
-
-    # The registry exposes no version endpoint, and its container image carries
-    # no labels at all (checked against registry:2.8.3 and registry:3.0.0), so
-    # neither the API nor `docker inspect` can answer this. The binary itself
-    # can, and reports the real release rather than a placeholder:
-    # `/bin/registry github.com/docker/distribution 2.8.3`.
-    - name: Query the version of the running Distribution Registry
-      ansible.builtin.command:
-        argv:
-          - docker
-          - exec
-          - docker-registry
-          - /bin/registry
-          - --version
-      register: docker_registry_running_version
-      changed_when: false
-
-    - name: Assert the running Distribution Registry is the version this role installs
-      ansible.builtin.assert:
-        that: "(docker_registry_running_version.stdout | trim | split(' ') | last) == docker_registry_defaults.docker_registry_version"
-        fail_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last | default('none') }}, expected {{ docker_registry_defaults.docker_registry_version }}"
-        success_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last }}"
 
     # ---------------------------------------------------------------------
     # What the previous major release wrote is still served after the upgrade

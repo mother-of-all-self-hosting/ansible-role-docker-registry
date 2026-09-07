@@ -78,7 +78,7 @@
       register: docker_registry_container_inspect
       changed_when: false
 
-    - name: Make sense of the Distribution Registry container inspection
+    - name: Parse the Distribution Registry container inspection
       ansible.builtin.set_fact:
         docker_registry_container: "{{ (docker_registry_container_inspect.stdout | from_json)[0] }}"
 
@@ -104,7 +104,7 @@
       register: docker_registry_image_inspect
       changed_when: false
 
-    - name: Make sense of the self-built Distribution Registry container image inspection
+    - name: Parse the self-built Distribution Registry container image inspection
       ansible.builtin.set_fact:
         docker_registry_image: "{{ (docker_registry_image_inspect.stdout | from_json)[0] }}"
 

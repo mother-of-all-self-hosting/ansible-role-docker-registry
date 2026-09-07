@@ -245,7 +245,7 @@
         src: "{{ docker_registry_base_path }}/env"
       register: docker_registry_env_file
 
-    - name: Make sense of the Distribution Registry environment file
+    - name: Parse the Distribution Registry environment file
       ansible.builtin.set_fact:
         docker_registry_env_lines: "{{ (docker_registry_env_file.content | b64decode).splitlines() }}"
 
@@ -307,7 +307,7 @@
           The container image bundles a registry configuration file at
           {{ docker_registry_defaults.docker_registry_container_config_path }}
 
-    - name: Make sense of the configuration file bundled inside the Distribution Registry container image
+    - name: Parse the configuration file bundled inside the Distribution Registry container image
       ansible.builtin.set_fact:
         docker_registry_bundled_delete_enabled: >-
           {{
@@ -456,7 +456,7 @@
       register: docker_registry_container_inspect
       changed_when: false
 
-    - name: Make sense of the Distribution Registry container inspection
+    - name: Parse the Distribution Registry container inspection
       ansible.builtin.set_fact:
         docker_registry_container: "{{ (docker_registry_container_inspect.stdout | from_json)[0] }}"
 
@@ -547,7 +547,7 @@
         src: "{{ docker_registry_bin_path }}/garbage-collect"
       register: docker_registry_gc_script
 
-    - name: Make sense of the Distribution Registry garbage collection script
+    - name: Parse the Distribution Registry garbage collection script
       ansible.builtin.set_fact:
         docker_registry_gc_script_lines: "{{ (docker_registry_gc_script.content | b64decode).splitlines() }}"
 

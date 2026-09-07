@@ -334,7 +334,7 @@
     # neither the API nor `docker inspect` can answer this. The binary itself
     # can, and reports the real release rather than a placeholder:
     # `/bin/registry github.com/docker/distribution 2.8.3`.
-    - name: Ask the running Distribution Registry which version it is
+    - name: Query the version of the running Distribution Registry
       ansible.builtin.command:
         argv:
           - docker

@@ -108,8 +108,7 @@
     - name: Ensure the standalone Distribution Registry control container is running
       ansible.builtin.command:
         cmd: >-
-          docker run
-          -d
+          docker run -d
           --name {{ docker_registry_molecule_control_container_name }}
           -p "127.0.0.1:5099:5000"
           -v {{ docker_registry_molecule_control_config_path }}:/etc/mash-molecule-control/config.yml:ro

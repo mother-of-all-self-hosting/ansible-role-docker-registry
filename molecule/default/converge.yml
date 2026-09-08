@@ -102,23 +102,19 @@
         cmd: "docker pull docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
       changed_when: true
 
+    # The image's entrypoint turns a `*.yml` argument into
+    # `registry serve <that file>`, so this is what replaces the bundled
+    # configuration file rather than merely adding to it.
     - name: Ensure the standalone Distribution Registry control container is running
       ansible.builtin.command:
-        argv:
-          - docker
-          - run
-          - -d
-          - --name
-          - "{{ docker_registry_molecule_control_container_name }}"
-          - -p
-          - "127.0.0.1:5099:5000"
-          - -v
-          - "{{ docker_registry_molecule_control_config_path }}:/etc/mash-molecule-control/config.yml:ro"
-          - "docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
-          # The image's entrypoint turns a `*.yml` argument into
-          # `registry serve <that file>`, so this is what replaces the bundled
-          # configuration file rather than merely adding to it.
-          - /etc/mash-molecule-control/config.yml
+        cmd: >-
+          docker run
+          -d
+          --name {{ docker_registry_molecule_control_container_name }}
+          -p "127.0.0.1:5099:5000"
+          -v {{ docker_registry_molecule_control_config_path }}:/etc/mash-molecule-control/config.yml:ro
+          docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}
+          /etc/mash-molecule-control/config.yml
       changed_when: true
 
     - name: Wait for the standalone Distribution Registry control container to answer (up to 60s)

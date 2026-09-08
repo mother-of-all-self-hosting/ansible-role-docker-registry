@@ -151,12 +151,7 @@
     # `/bin/registry github.com/docker/distribution 2.8.3`.
     - name: Query the version of the running Distribution Registry
       ansible.builtin.command:
-        argv:
-          - docker
-          - exec
-          - docker-registry
-          - /bin/registry
-          - --version
+        cmd: docker exec docker-registry /bin/registry --version
       register: docker_registry_version_reported
       changed_when: false
 
@@ -287,12 +282,7 @@
     # from /etc/docker/registry/config.yml to /etc/distribution/config.yml.
     - name: Read the configuration file bundled inside the Distribution Registry container image
       ansible.builtin.command:
-        argv:
-          - docker
-          - exec
-          - docker-registry
-          - cat
-          - "{{ docker_registry_defaults.docker_registry_container_config_path }}"
+        cmd: docker exec docker-registry cat {{ docker_registry_defaults.docker_registry_container_config_path }}
       register: docker_registry_bundled_config_raw
       changed_when: false
       failed_when: false
@@ -454,10 +444,7 @@
 
     - name: Inspect the Distribution Registry container
       ansible.builtin.command:
-        argv:
-          - docker
-          - inspect
-          - docker-registry
+        cmd: docker inspect docker-registry
       register: docker_registry_container_raw
       changed_when: false
 

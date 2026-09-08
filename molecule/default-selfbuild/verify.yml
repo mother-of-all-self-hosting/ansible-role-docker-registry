@@ -73,10 +73,7 @@
 
     - name: Inspect the Distribution Registry container
       ansible.builtin.command:
-        argv:
-          - docker
-          - inspect
-          - docker-registry
+        cmd: docker inspect docker-registry
       register: docker_registry_container_raw
       changed_when: false
 
@@ -99,10 +96,7 @@
 
     - name: Inspect the self-built Distribution Registry container image
       ansible.builtin.command:
-        argv:
-          - docker
-          - inspect
-          - "distribution/distribution:v{{ docker_registry_defaults.docker_registry_version }}"
+        cmd: docker inspect distribution/distribution:v{{ docker_registry_defaults.docker_registry_version }}
       register: docker_registry_image_raw
       changed_when: false
 

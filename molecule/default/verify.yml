@@ -161,14 +161,14 @@
           - docker-registry
           - /bin/registry
           - --version
-      register: docker_registry_running_version
+      register: docker_registry_version_reported
       changed_when: false
 
     - name: Assert the running Distribution Registry is the version this role installs
       ansible.builtin.assert:
-        that: "(docker_registry_running_version.stdout | trim | split(' ') | last) == docker_registry_defaults.docker_registry_version"
-        fail_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last | default('none') }}, expected {{ docker_registry_defaults.docker_registry_version }}"
-        success_msg: "Distribution Registry reports {{ docker_registry_running_version.stdout | trim | split(' ') | last }}"
+        that: "(docker_registry_version_reported.stdout | trim | split(' ') | last) == docker_registry_defaults.docker_registry_version"
+        fail_msg: "Distribution Registry reports {{ docker_registry_version_reported.stdout | trim | split(' ') | last | default('none') }}, expected {{ docker_registry_defaults.docker_registry_version }}"
+        success_msg: "Distribution Registry reports {{ docker_registry_version_reported.stdout | trim | split(' ') | last }}"
 
     # ---------------------------------------------------------------------
     # A push/pull round trip, verified by digest
@@ -377,17 +377,17 @@
             (docker_registry_seed_state.running_version | split(' ') | last)
             == docker_registry_molecule_seed_version
           - >-
-            (docker_registry_running_version.stdout | trim | split(' ') | last)
+            (docker_registry_version_reported.stdout | trim | split(' ') | last)
             != docker_registry_molecule_seed_version
         fail_msg: >-
           The storage was not seeded by a different release than the one now
           running (seeded by {{ docker_registry_seed_state.running_version }},
-          now running {{ docker_registry_running_version.stdout | trim }}), so
+          now running {{ docker_registry_version_reported.stdout | trim }}), so
           nothing below is evidence about an upgrade
         success_msg: >-
           The storage was written by {{ docker_registry_molecule_seed_version }} and is
           now being served by
-          {{ docker_registry_running_version.stdout | trim | split(' ') | last }}
+          {{ docker_registry_version_reported.stdout | trim | split(' ') | last }}
 
     - name: Assert the previous major release's round trip succeeded at the time
       ansible.builtin.assert:
@@ -448,7 +448,7 @@
           vs {{ docker_registry_seeded.pushed.layer_digest }})
         success_msg: >-
           The image {{ docker_registry_molecule_seed_version }} pushed is still served by
-          {{ docker_registry_running_version.stdout | trim | split(' ') | last }}, with the
+          {{ docker_registry_version_reported.stdout | trim | split(' ') | last }}, with the
           manifest digest unchanged and the layer re-hashing to
           {{ docker_registry_seeded.pushed.layer_digest }} - so the upgrade needs no data migration
 
@@ -696,7 +696,7 @@
       ansible.builtin.debug:
         msg:
           - "Distribution Registry systemd: {{ docker_registry_service.status.ActiveState }}"
-          - "Distribution Registry version: {{ docker_registry_running_version.stdout | trim }}"
+          - "Distribution Registry version: {{ docker_registry_version_reported.stdout | trim }}"
           - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
           - >-
             Distribution Registry upgrade: storage seeded by {{ docker_registry_seed_state.running_version }};

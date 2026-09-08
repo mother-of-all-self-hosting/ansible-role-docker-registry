@@ -99,10 +99,7 @@
     # community.docker collection and would fail the playbook syntax check.
     - name: Ensure the stock Distribution Registry container image is pulled
       ansible.builtin.command:
-        argv:
-          - docker
-          - pull
-          - "docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
+        cmd: "docker pull docker.io/registry:{{ docker_registry_defaults.docker_registry_version }}"
       changed_when: true
 
     - name: Ensure the standalone Distribution Registry control container is running
@@ -200,12 +197,7 @@
 
     - name: Record which Distribution Registry release seeded the storage
       ansible.builtin.command:
-        argv:
-          - docker
-          - exec
-          - docker-registry
-          - /bin/registry
-          - --version
+        cmd: docker exec docker-registry /bin/registry --version
       register: docker_registry_molecule_seed_running_version
       changed_when: false
 

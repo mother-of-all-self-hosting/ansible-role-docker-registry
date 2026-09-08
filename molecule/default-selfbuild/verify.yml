@@ -46,11 +46,7 @@
     - name: Retrieve the Distribution Registry systemd service log for debugging
       when: docker_registry_debug_service_enabled | bool
       ansible.builtin.command:
-        argv:
-          - journalctl
-          - --no-pager
-          - --output=cat
-          - --unit=docker-registry.service
+        cmd: journalctl --no-pager --output=cat --unit=docker-registry.service
       changed_when: false
 
     # `/` answers 200 with an empty body on any registry, so hitting it proves

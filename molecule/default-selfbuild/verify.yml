@@ -15,6 +15,8 @@
   become: true
   gather_facts: false
   tasks:
+    - name: Verify that Distribution Registry works
+      block:
     # The role is not included in this playbook, so its defaults are not in
     # scope. Reading defaults/main.yml directly ties the version assertion
     # below.
@@ -120,3 +122,19 @@
           - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
           - "Distribution Registry image: {{ docker_registry_container.Config.Image }}"
           - "Distribution Registry repository digests: {{ docker_registry_image.RepoDigests }}"
+
+      rescue:
+        # Whatever went wrong, the reason is almost always in the systemd service log.
+        - name: Retrieve the Distribution Registry systemd service log
+          ansible.builtin.command:
+            cmd: journalctl --no-pager --output=cat --unit=docker-registry.service
+          register: docker_registry_service_log
+          changed_when: false
+
+        - name: Show the Distribution Registry systemd service log
+          ansible.builtin.debug:
+            var: docker_registry_service_log.stdout_lines
+
+        - name: Fail because verification did not pass
+          ansible.builtin.fail:
+            msg: "Distribution Registry verification failed. The systemd service log is printed above."

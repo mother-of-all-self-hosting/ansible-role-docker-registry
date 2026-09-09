@@ -17,111 +17,111 @@
   tasks:
     - name: Verify that Distribution Registry works
       block:
-    # The role is not included in this playbook, so its defaults are not in
-    # scope. Reading defaults/main.yml directly ties the version assertion
-    # below.
-    - name: Load the role defaults
-      ansible.builtin.include_vars:
-        file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
-        name: docker_registry_defaults
+        # The role is not included in this playbook, so its defaults are not in
+        # scope. Reading defaults/main.yml directly ties the version assertion
+        # below.
+        - name: Load the role defaults
+          ansible.builtin.include_vars:
+            file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+            name: docker_registry_defaults
 
-    - name: Wait for the Distribution Registry systemd service to become active (up to 180s)
-      ansible.builtin.systemd_service:
-        name: docker-registry.service
-      register: docker_registry_service
-      until: docker_registry_service.status.ActiveState == 'active'
-      retries: 36
-      delay: 5
-      # So that giving up is reported by the assertion below rather than as a
-      # wall of systemd unit properties.
-      failed_when: false
+        - name: Wait for the Distribution Registry systemd service to become active (up to 180s)
+          ansible.builtin.systemd_service:
+            name: docker-registry.service
+          register: docker_registry_service
+          until: docker_registry_service.status.ActiveState == 'active'
+          retries: 36
+          delay: 5
+          # So that giving up is reported by the assertion below rather than as a
+          # wall of systemd unit properties.
+          failed_when: false
 
-    # `Restart=always` in the systemd unit means that even a container which crashes
-    # and gets restarted reads as active here, so this is a precondition rather than
-    # a result.
-    - name: Assert the Distribution Registry systemd service is active
-      ansible.builtin.assert:
-        that: docker_registry_service.status.ActiveState == 'active'
-        fail_msg: "docker-registry.service is not active ({{ docker_registry_service.status.ActiveState }})"
-        success_msg: "docker-registry.service is active"
+        # `Restart=always` in the systemd unit means that even a container which crashes
+        # and gets restarted reads as active here, so this is a precondition rather than
+        # a result.
+        - name: Assert the Distribution Registry systemd service is active
+          ansible.builtin.assert:
+            that: docker_registry_service.status.ActiveState == 'active'
+            fail_msg: "docker-registry.service is not active ({{ docker_registry_service.status.ActiveState }})"
+            success_msg: "docker-registry.service is active"
 
-    - name: Retrieve the Distribution Registry systemd service log for debugging
-      when: docker_registry_debug_service_enabled | bool
-      ansible.builtin.command:
-        cmd: journalctl --no-pager --output=cat --unit=docker-registry.service
-      changed_when: false
+        - name: Retrieve the Distribution Registry systemd service log for debugging
+          when: docker_registry_debug_service_enabled | bool
+          ansible.builtin.command:
+            cmd: journalctl --no-pager --output=cat --unit=docker-registry.service
+          changed_when: false
 
-    # `/` answers 200 with an empty body on any registry, so hitting it proves
-    # only that something is listening. `/v2/` is the API root, and the
-    # `Docker-Distribution-Api-Version` header it carries is what a Docker
-    # client uses to decide it is talking to a registry at all.
-    - name: Query the Distribution Registry API root (up to 300s)
-      ansible.builtin.uri:
-        url: "{{ docker_registry_molecule_registry_url }}/v2/"
-      register: docker_registry_api_root
-      until: docker_registry_api_root is not failed
-      retries: 60
-      delay: 5
+        # `/` answers 200 with an empty body on any registry, so hitting it proves
+        # only that something is listening. `/v2/` is the API root, and the
+        # `Docker-Distribution-Api-Version` header it carries is what a Docker
+        # client uses to decide it is talking to a registry at all.
+        - name: Query the Distribution Registry API root (up to 300s)
+          ansible.builtin.uri:
+            url: "{{ docker_registry_molecule_registry_url }}/v2/"
+          register: docker_registry_api_root
+          until: docker_registry_api_root is not failed
+          retries: 60
+          delay: 5
 
-    - name: Assert the Distribution Registry API root identifies itself as a registry
-      ansible.builtin.assert:
-        that:
-          - docker_registry_api_root.status == 200
-          - docker_registry_api_root.docker_distribution_api_version == 'registry/2.0'
-        fail_msg: "The registry API root did not identify itself: {{ docker_registry_api_root }}"
-        success_msg: >-
-          The registry API root answers 200 and reports
-          {{ docker_registry_api_root.docker_distribution_api_version }}
+        - name: Assert the Distribution Registry API root identifies itself as a registry
+          ansible.builtin.assert:
+            that:
+              - docker_registry_api_root.status == 200
+              - docker_registry_api_root.docker_distribution_api_version == 'registry/2.0'
+            fail_msg: "The registry API root did not identify itself: {{ docker_registry_api_root }}"
+            success_msg: >-
+              The registry API root answers 200 and reports
+              {{ docker_registry_api_root.docker_distribution_api_version }}
 
-    - name: Inspect the Distribution Registry container
-      ansible.builtin.command:
-        cmd: docker inspect docker-registry
-      register: docker_registry_container_raw
-      changed_when: false
+        - name: Inspect the Distribution Registry container
+          ansible.builtin.command:
+            cmd: docker inspect docker-registry
+          register: docker_registry_container_raw
+          changed_when: false
 
-    - name: Parse the Distribution Registry container inspection
-      ansible.builtin.set_fact:
-        docker_registry_container: "{{ (docker_registry_container_raw.stdout | from_json)[0] }}"
+        - name: Parse the Distribution Registry container inspection
+          ansible.builtin.set_fact:
+            docker_registry_container: "{{ (docker_registry_container_raw.stdout | from_json)[0] }}"
 
-    # The self-built image is tagged after the git tag of the source that was
-    # checked out, so this is what tells a self-build run apart from one that
-    # quietly ran the image from Docker Hub instead.
-    - name: Assert the Distribution Registry container runs the self-built image
-      ansible.builtin.assert:
-        that: >-
-          docker_registry_container.Config.Image
-          == 'distribution/distribution:v' ~ docker_registry_defaults.docker_registry_version
-        fail_msg: >-
-          The container is not running the self-built image:
-          {{ docker_registry_container.Config.Image }}
-        success_msg: "The container runs the self-built {{ docker_registry_container.Config.Image }}"
+        # The self-built image is tagged after the git tag of the source that was
+        # checked out, so this is what tells a self-build run apart from one that
+        # quietly ran the image from Docker Hub instead.
+        - name: Assert the Distribution Registry container runs the self-built image
+          ansible.builtin.assert:
+            that: >-
+              docker_registry_container.Config.Image
+              == 'distribution/distribution:v' ~ docker_registry_defaults.docker_registry_version
+            fail_msg: >-
+              The container is not running the self-built image:
+              {{ docker_registry_container.Config.Image }}
+            success_msg: "The container runs the self-built {{ docker_registry_container.Config.Image }}"
 
-    - name: Inspect the self-built Distribution Registry container image
-      ansible.builtin.command:
-        cmd: docker inspect distribution/distribution:v{{ docker_registry_defaults.docker_registry_version }}
-      register: docker_registry_image_raw
-      changed_when: false
+        - name: Inspect the self-built Distribution Registry container image
+          ansible.builtin.command:
+            cmd: docker inspect distribution/distribution:v{{ docker_registry_defaults.docker_registry_version }}
+          register: docker_registry_image_raw
+          changed_when: false
 
-    - name: Parse the self-built Distribution Registry container image inspection
-      ansible.builtin.set_fact:
-        docker_registry_image: "{{ (docker_registry_image_raw.stdout | from_json)[0] }}"
+        - name: Parse the self-built Distribution Registry container image inspection
+          ansible.builtin.set_fact:
+            docker_registry_image: "{{ (docker_registry_image_raw.stdout | from_json)[0] }}"
 
-    # An image pulled from a registry carries the repository digest it was
-    # pulled by. One that was built here has never been in a registry, so it
-    # has none - which is the difference this scenario exists to demonstrate.
-    - name: Assert the Distribution Registry container image was built here rather than pulled
-      ansible.builtin.assert:
-        that: docker_registry_image.RepoDigests | length == 0
-        fail_msg: "The image was pulled rather than built here: {{ docker_registry_image.RepoDigests }}"
-        success_msg: "The image carries no repository digest, so it was built on this host"
+        # An image pulled from a registry carries the repository digest it was
+        # pulled by. One that was built here has never been in a registry, so it
+        # has none - which is the difference this scenario exists to demonstrate.
+        - name: Assert the Distribution Registry container image was built here rather than pulled
+          ansible.builtin.assert:
+            that: docker_registry_image.RepoDigests | length == 0
+            fail_msg: "The image was pulled rather than built here: {{ docker_registry_image.RepoDigests }}"
+            success_msg: "The image carries no repository digest, so it was built on this host"
 
-    - name: Show the Distribution Registry self-build verification summary
-      ansible.builtin.debug:
-        msg:
-          - "Distribution Registry systemd: {{ docker_registry_service.status.ActiveState }}"
-          - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
-          - "Distribution Registry image: {{ docker_registry_container.Config.Image }}"
-          - "Distribution Registry repository digests: {{ docker_registry_image.RepoDigests }}"
+        - name: Show the Distribution Registry self-build verification summary
+          ansible.builtin.debug:
+            msg:
+              - "Distribution Registry systemd: {{ docker_registry_service.status.ActiveState }}"
+              - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
+              - "Distribution Registry image: {{ docker_registry_container.Config.Image }}"
+              - "Distribution Registry repository digests: {{ docker_registry_image.RepoDigests }}"
 
       rescue:
         # Whatever went wrong, the reason is almost always in the systemd service log.

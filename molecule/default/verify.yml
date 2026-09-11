@@ -9,6 +9,11 @@
   hosts: all
   become: true
   gather_facts: false
+
+  vars:
+    docker_registry_verify_units:
+      - docker-registry.service
+
   tasks:
     - name: Verify that Distribution Registry works
       block:
@@ -97,13 +102,14 @@
         # The unit is up and the registry API - not merely some HTTP server - answers
         # ---------------------------------------------------------------------
 
-        - name: Wait for the Distribution Registry systemd service to become active (up to 180s)
+        - name: Wait for the Distribution Registry systemd services to become active (up to 180s each)
           ansible.builtin.systemd_service:
-            name: docker-registry.service
-          register: docker_registry_service
-          until: docker_registry_service.status.ActiveState == 'active'
+            name: "{{ item }}"
+          register: docker_registry_services
+          until: docker_registry_services.status.ActiveState == 'active'
           retries: 36
           delay: 5
+          loop: "{{ docker_registry_verify_units }}"
           # So that giving up is reported by the assertion below rather than as a
           # wall of systemd unit properties.
           failed_when: false
@@ -111,17 +117,20 @@
         # `Restart=always` in the systemd unit means that even a container which crashes
         # and gets restarted reads as active here, so this is a precondition rather than
         # a result.
-        - name: Assert the Distribution Registry systemd service is active
+        - name: Assert the Distribution Registry systemd services are active
           ansible.builtin.assert:
-            that: docker_registry_service.status.ActiveState == 'active'
-            fail_msg: "docker-registry.service is not active ({{ docker_registry_service.status.ActiveState }})"
-            success_msg: "docker-registry.service is active"
+            that: docker_registry_services.results | map(attribute='status.ActiveState') | unique | list == ['active']
+            fail_msg: >-
+              Not every service is active:
+              {{ dict(docker_registry_verify_units | zip(docker_registry_services.results | map(attribute='status.ActiveState'))) }}
+            success_msg: "Every systemd service is active"
 
-        - name: Retrieve the Distribution Registry systemd service log for debugging
+        - name: Retrieve the Distribution Registry systemd services log for debugging
           when: docker_registry_debug_service_enabled | bool
           ansible.builtin.command:
-            cmd: journalctl --no-pager --output=cat --unit=docker-registry.service
+            cmd: "journalctl --no-pager --output=cat --unit={{ item }}"
           changed_when: false
+          loop: "{{ docker_registry_verify_units }}"
 
         # `/` answers 200 with an empty body on any registry, so hitting it proves
         # only that something is listening. `/v2/` is the API root, and the
@@ -680,7 +689,7 @@
         - name: Show the Distribution Registry verification summary
           ansible.builtin.debug:
             msg:
-              - "Distribution Registry systemd: {{ docker_registry_service.status.ActiveState }}"
+              - "Distribution Registry systemd: {% for unit, state in docker_registry_verify_units | zip(docker_registry_services.results | map(attribute='status.ActiveState')) %}{{ unit }} ({{ state }}){% if not loop.last %}, {% endif %}{% endfor %}"
               - "Distribution Registry version: {{ docker_registry_version_reported.stdout | trim }}"
               - "Distribution Registry API root: {{ docker_registry_api_root.status }} ({{ docker_registry_api_root.docker_distribution_api_version }})"
               - >-

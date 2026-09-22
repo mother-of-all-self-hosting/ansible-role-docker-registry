@@ -59,7 +59,7 @@ The role is installed twice more, with `docker_registry_storage_delete_enabled` 
 
 What the v3 image's configuration file would otherwise have changed is checked too: the debug/metrics port is refused on the container's own address while the API answers on that same address (which is what keeps the refusal from being a broken probe), and `X-Content-Type-Options: nosniff` is still sent.
 
-Finally the running version is compared against `docker_registry_version`, and the garbage collection script and its timer are checked — including an assertion that the script is *not* valid bash. See [Garbage collection](../README.md#garbage-collection) for why that is deliberate.
+Finally the running version is compared against `docker_registry_version`, and the garbage collection script and its timer are checked — including an assertion that the script is *not* valid bash. Refer to [Garbage collection](../README.md#garbage-collection) for why that is deliberate.
 
 ### `default-selfbuild`
 

@@ -106,7 +106,7 @@ You should be able to:
 - pull images from your registry from any IP address
 - push images to your registry from the whitelisted IP addresses (`docker_registry_private_services_whitelisted_ip_ranges`)
 
-With custom Traefik configuration (hint: see [`docker_registry_container_labels_traefik_rule_*` variables](../defaults/main.yml), you may be able to add additional restrictions.
+With custom Traefik configuration (hint: refer to [`docker_registry_container_labels_traefik_rule_*` variables](../defaults/main.yml), you may be able to add additional restrictions.
 
 To **test pushing** images, try the following:
 
@@ -130,7 +130,7 @@ docker pull registry.example.com/alpine:3.17.2
 This role used to install Docker Registry 2.8.3 and now installs Distribution Registry v3.
 
 >[!NOTE]
-> The original Docker Registry project has been deprecated, and donated to Cloud Native Computing Foundation (CNCF) in 2019. See [this announcement](https://docs.docker.com/retired/#registry-now-cncf-distribution) for details.
+> The original Docker Registry project has been deprecated, and donated to Cloud Native Computing Foundation (CNCF) in 2019. Refer to [this announcement](https://docs.docker.com/retired/#registry-now-cncf-distribution) for details.
 
 **No data migration is involved.** The on-disk layout is unchanged, and there is no upstream migration guide because upstream does not consider one necessary (see: [distribution/distribution#4615](https://github.com/distribution/distribution/discussions/4615)). There is nothing for you to do beyond re-running the playbook.
 

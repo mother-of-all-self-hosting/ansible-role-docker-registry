@@ -19,7 +19,7 @@ docker_registry_data_path: "{{ docker_registry_base_path }}/data"
 docker_registry_bin_path: "{{ docker_registry_base_path }}/bin"
 
 # renovate: datasource=docker depName=registry versioning=semver
-docker_registry_version: 3.1.1
+docker_registry_version: 3.1.2
 
 # Path of the configuration file which the container image bundles.
 #

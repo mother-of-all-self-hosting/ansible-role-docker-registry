@@ -115,14 +115,16 @@
           ansible.builtin.set_fact:
             docker_registry_image: "{{ (docker_registry_image_raw.stdout | from_json)[0] }}"
 
-        # An image pulled from a registry carries the repository digest it was
-        # pulled by. One that was built here has never been in a registry, so it
-        # has none - which is the difference this scenario exists to demonstrate.
+        # An image pulled from a registry carries the time upstream built it. One
+        # that was built here was created during this test run - which is the
+        # difference this scenario exists to demonstrate. Repository digests cannot
+        # tell the two apart: Docker's containerd image store records one for local
+        # builds too.
         - name: Assert the Distribution Registry container image was built here rather than pulled
           ansible.builtin.assert:
-            that: docker_registry_image.RepoDigests | length == 0
-            fail_msg: "The image was pulled rather than built here: {{ docker_registry_image.RepoDigests }}"
-            success_msg: "The image carries no repository digest, so it was built on this host"
+            that: (now(utc=true) - (docker_registry_image.Created[:19] | to_datetime('%Y-%m-%dT%H:%M:%S'))).total_seconds() < 3600
+            fail_msg: "The image was created at {{ docker_registry_image.Created }}, not during this test run, so it was pulled rather than built here"
+            success_msg: "The image was created during this test run, so it was built on this host"
 
         - name: Verify nothing was quietly restarting while all of that was being checked
           when: "docker_registry_restarts_check_enabled | bool"

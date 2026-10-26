@@ -38,7 +38,6 @@
     group: "{{ docker_registry_gid }}"
   with_items:
     - garbage-collect
-  register: docker_registry_bin_files_result
 
 - name: Run if self-building of Distribution Registry container image is not enabled
   when: "not docker_registry_container_image_self_build | bool"
@@ -123,7 +122,6 @@
     docker_registry_restart_necessary: >-
       {{
         docker_registry_support_files_result.changed | default(false)
-        or docker_registry_bin_files_result.changed | default(false)
         or docker_registry_systemd_service_result.changed | default(false)
         or docker_registry_container_image_pull_result_ansible_module.changed | default(false)
         or docker_registry_container_image_pull_result_command.changed | default(false)

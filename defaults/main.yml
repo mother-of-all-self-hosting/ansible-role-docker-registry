@@ -83,8 +83,9 @@ docker_registry_container_additional_networks_custom: []
 # To inject your own other container labels, see `docker_registry_container_labels_additional_labels_custom`.
 docker_registry_container_labels_traefik_enabled: true
 docker_registry_container_labels_traefik_docker_network: ""
-docker_registry_container_labels_traefik_rule_public: "Host(`{{ docker_registry_hostname }}`) && (Method(`GET`) || Method(`HEAD`))"
-docker_registry_container_labels_traefik_rule_private: "Host(`{{ docker_registry_hostname }}`) && (Method(`POST`) || Method(`PUT`) || Method(`DELETE`) || Method(`PATCH`))"
+docker_registry_container_labels_traefik_hostname: "{{ docker_registry_hostname }}"
+docker_registry_container_labels_traefik_rule_public: "Host(`{{ docker_registry_container_labels_traefik_hostname }}`) && (Method(`GET`) || Method(`HEAD`))"
+docker_registry_container_labels_traefik_rule_private: "Host(`{{ docker_registry_container_labels_traefik_hostname }}`) && (Method(`POST`) || Method(`PUT`) || Method(`DELETE`) || Method(`PATCH`))"
 docker_registry_container_labels_traefik_entrypoints: web-secure
 docker_registry_container_labels_traefik_tls: "{{ docker_registry_container_labels_traefik_entrypoints != 'web' }}"
 docker_registry_container_labels_traefik_tls_certResolver: default  # noqa var-naming

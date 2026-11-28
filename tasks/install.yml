@@ -82,6 +82,7 @@
         owner: "{{ docker_registry_uid }}"
         group: "{{ docker_registry_gid }}"
         recurse: true
+      tags: molecule-idempotence-notest
 
     - name: Ensure Distribution Registry repository is present on self-build
       ansible.builtin.git:
